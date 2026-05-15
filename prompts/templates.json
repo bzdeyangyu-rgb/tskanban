@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "3095bc2f-438e-49a6-a07d-371972e3f5c3",
+    "name": "cinematic",
+    "prompt": "保留人物脸部，增强衣服纹理，电影感光影",
+    "createdAt": "2026-05-15T15:20:24.989Z",
+    "negativePrompt": "过曝,噪点"
+  }
+]
