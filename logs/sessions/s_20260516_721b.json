@@ -1,0 +1,17 @@
+{
+  "sessionId": "s_20260516_721b",
+  "createdAt": "2026-05-16T06:51:49.743Z",
+  "updatedAt": "2026-05-16T06:51:49.806Z",
+  "versions": [],
+  "assets": [
+    {
+      "assetId": "ast_01333c6c",
+      "kind": "base",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260516\\ast_01333c6c.jpg",
+      "publicUrl": "/outputs/20260516/ast_01333c6c.jpg",
+      "mime": "image/jpeg",
+      "size": 12277796,
+      "createdAt": "2026-05-16T06:51:49.806Z"
+    }
+  ]
+}

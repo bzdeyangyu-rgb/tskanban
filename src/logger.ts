@@ -7,7 +7,10 @@ export type EventAction =
   | "img2img"
   | "inpaint"
   | "prompt_template_use"
-  | "prompt_template_create";
+  | "prompt_template_create"
+  | "asset_upload"
+  | "flow_validate"
+  | "flow_execute";
 
 export type RagEvent = {
   event_id: string;
@@ -23,6 +26,33 @@ export type RagEvent = {
   status: "success" | "failed";
   latency_ms: number;
   error_message?: string | undefined;
+  flow_id?: string | undefined;
+  flow_structure?: { nodes: string[]; edges: { from: string; to: string }[] } | undefined;
+  node_id?: string | undefined;
+  node_type?: string | undefined;
+  node_status?: "idle" | "running" | "success" | "failed" | "retrying" | undefined;
+  retry_attempt?: number | undefined;
+  max_retries?: number | undefined;
+  node_latency_ms?: number | undefined;
+  selection_box?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  } | undefined;
+  local_prompt?: string | undefined;
+};
+
+export type EventQuery = {
+  sessionId?: string | undefined;
+  action?: string | undefined;
+  model?: string | undefined;
+  keyword?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+  limit?: number | undefined;
 };
 
 const ROOT = process.cwd();
@@ -37,6 +67,10 @@ export function createSessionId() {
   const day = String(d.getDate()).padStart(2, "0");
   const suffix = randomUUID().slice(0, 4);
   return `s_${y}${m}${day}_${suffix}`;
+}
+
+export function createFlowId() {
+  return `f_${randomUUID().slice(0, 8)}`;
 }
 
 export function createBaseEvent(input: {
@@ -77,8 +111,19 @@ function toMarkdownBlock(event: RagEvent): string {
   const input = event.input_assets.length > 0 ? event.input_assets.join(" + ") : "-";
   const output = event.output_assets.length > 0 ? event.output_assets.join(", ") : "-";
   const error = event.error_message ? `\n- error: ${event.error_message}` : "";
+  const flowInfo = event.flow_id ? `\n- flow: ${event.flow_id}` : "";
+  const nodeInfo = event.node_id
+    ? `\n- node: ${event.node_id} (${event.node_type ?? "unknown"}) ${event.node_status ?? ""}`
+    : "";
+  const retryInfo =
+    typeof event.retry_attempt === "number"
+      ? `\n- retry: ${event.retry_attempt}/${event.max_retries ?? 3}`
+      : "";
+  const selectionInfo = event.selection_box
+    ? `\n- selection: ${JSON.stringify(event.selection_box)}\n- local_prompt: "${event.local_prompt ?? ""}"`
+    : "";
 
-  return `\n## ${date} ${event.action} ${event.status}\n- session: ${event.session_id}\n- model: ${event.model}\n- prompt: "${event.prompt}"\n- negative_prompt: "${event.negative_prompt ?? ""}"\n- params: ${params}\n- input: ${input}\n- output: ${output}\n- latency: ${event.latency_ms}ms${error}\n`;
+  return `\n## ${date} ${event.action} ${event.status}\n- session: ${event.session_id}\n- model: ${event.model}\n- prompt: "${event.prompt}"\n- negative_prompt: "${event.negative_prompt ?? ""}"\n- params: ${params}\n- input: ${input}\n- output: ${output}\n- latency: ${event.latency_ms}ms${flowInfo}${nodeInfo}${retryInfo}${selectionInfo}${error}\n`;
 }
 
 export async function readLatestEvents(limit: number): Promise<RagEvent[]> {
@@ -100,4 +145,59 @@ export async function readLatestEvents(limit: number): Promise<RagEvent[]> {
   }
 
   return events;
+}
+
+export async function queryEvents(query: EventQuery): Promise<RagEvent[]> {
+  const raw = await readFile(JSONL_PATH, "utf8").catch(() => "");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  const fromMs = query.from ? Date.parse(query.from) : Number.NEGATIVE_INFINITY;
+  const toMs = query.to ? Date.parse(query.to) : Number.POSITIVE_INFINITY;
+  const keyword = query.keyword?.toLowerCase();
+
+  const all = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      try {
+        return JSON.parse(line) as RagEvent;
+      } catch {
+        return null;
+      }
+    })
+    .filter((event): event is RagEvent => event !== null);
+
+  const filtered = all.filter((event) => {
+    if (query.sessionId && event.session_id !== query.sessionId) {
+      return false;
+    }
+
+    if (query.action && event.action !== query.action) {
+      return false;
+    }
+
+    if (query.model && event.model !== query.model) {
+      return false;
+    }
+
+    const ts = Date.parse(event.timestamp);
+    if (ts < fromMs || ts > toMs) {
+      return false;
+    }
+
+    if (keyword) {
+      const text = `${event.prompt} ${event.negative_prompt ?? ""} ${JSON.stringify(event.params)} ${event.error_message ?? ""}`.toLowerCase();
+      if (!text.includes(keyword)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  const limit = query.limit ?? 50;
+  return filtered.slice(-limit);
 }

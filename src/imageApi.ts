@@ -1,5 +1,7 @@
 import axios from "axios";
 import { z } from "zod";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 const envSchema = z.object({
   IMAGE_API_BASE_URL: z.string().url(),
@@ -16,6 +18,7 @@ export type ImageParams = {
   steps?: number | undefined;
   strength?: number | undefined;
   seed?: number | undefined;
+  [key: string]: unknown;
 };
 
 export type ImageRequest = {
@@ -37,8 +40,40 @@ function loadEnv() {
   return envSchema.parse(process.env);
 }
 
-function normalizePath(path: string): string {
-  return path.startsWith("/") ? path : `/${path}`;
+function normalizePath(value: string): string {
+  return value.startsWith("/") ? value : `/${value}`;
+}
+
+function extensionToMime(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".png") {
+    return "image/png";
+  }
+  if (ext === ".jpg" || ext === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (ext === ".webp") {
+    return "image/webp";
+  }
+  return "application/octet-stream";
+}
+
+async function normalizeImageInput(input: string | undefined): Promise<string | undefined> {
+  if (!input) {
+    return undefined;
+  }
+
+  if (input.startsWith("data:") || input.startsWith("http://") || input.startsWith("https://")) {
+    return input;
+  }
+
+  try {
+    const buffer = await readFile(input);
+    const mime = extensionToMime(input);
+    return `data:${mime};base64,${buffer.toString("base64")}`;
+  } catch {
+    return input;
+  }
 }
 
 function extractOutputAssets(data: unknown): string[] {
@@ -50,10 +85,25 @@ function extractOutputAssets(data: unknown): string[] {
   const directFields = ["output", "outputs", "image", "images", "url", "urls", "result"];
 
   for (const key of directFields) {
-    const value = candidate[key];
-    const urls = normalizeToStringArray(value);
+    const urls = normalizeToStringArray(candidate[key]);
     if (urls.length > 0) {
       return urls;
+    }
+  }
+
+  const dataField = candidate.data;
+  const fromData = normalizeToStringArray(dataField);
+  if (fromData.length > 0) {
+    return fromData;
+  }
+
+  if (dataField && typeof dataField === "object") {
+    const nested = dataField as Record<string, unknown>;
+    for (const key of directFields) {
+      const urls = normalizeToStringArray(nested[key]);
+      if (urls.length > 0) {
+        return urls;
+      }
     }
   }
 
@@ -78,12 +128,12 @@ function normalizeToStringArray(value: unknown): string[] {
 
     if (item && typeof item === "object") {
       const record = item as Record<string, unknown>;
-      const url = record.url;
-      const imageUrl = record.image_url;
-      if (typeof url === "string") {
-        out.push(url);
-      } else if (typeof imageUrl === "string") {
-        out.push(imageUrl);
+      const candidates = [record.url, record.image_url, record.output, record.result];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string") {
+          out.push(candidate);
+          break;
+        }
       }
     }
   }
@@ -93,16 +143,19 @@ function normalizeToStringArray(value: unknown): string[] {
 
 export async function generateImage(request: ImageRequest): Promise<ImageResult> {
   const env = loadEnv();
-  const path = request.action === "text2img" ? env.IMAGE_API_TEXT2IMG_PATH : env.IMAGE_API_INPAINT_PATH;
-  const url = `${env.IMAGE_API_BASE_URL}${normalizePath(path)}`;
+  const endpoint = request.action === "text2img" ? env.IMAGE_API_TEXT2IMG_PATH : env.IMAGE_API_INPAINT_PATH;
+  const url = `${env.IMAGE_API_BASE_URL}${normalizePath(endpoint)}`;
+
+  const inputImage = await normalizeImageInput(request.inputImage);
+  const maskImage = await normalizeImageInput(request.maskImage);
 
   const payload = {
     model: request.model,
     prompt: request.prompt,
     negative_prompt: request.negativePrompt,
     ...request.params,
-    input_image: request.inputImage,
-    mask_image: request.maskImage
+    input_image: inputImage,
+    mask_image: maskImage
   };
 
   const headers: Record<string, string> = {
@@ -118,9 +171,8 @@ export async function generateImage(request: ImageRequest): Promise<ImageResult>
     timeout: env.IMAGE_API_TIMEOUT_MS
   });
 
-  const outputAssets = extractOutputAssets(response.data);
   return {
-    outputAssets,
+    outputAssets: extractOutputAssets(response.data),
     raw: response.data
   };
 }

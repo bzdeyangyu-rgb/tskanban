@@ -1,0 +1,35 @@
+{
+  "sessionId": "s_20260517_2555",
+  "createdAt": "2026-05-16T16:01:13.338Z",
+  "updatedAt": "2026-05-16T16:01:49.680Z",
+  "versions": [],
+  "assets": [
+    {
+      "assetId": "ast_3ba831d9",
+      "kind": "base",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260517\\ast_3ba831d9.jpg",
+      "publicUrl": "/outputs/20260517/ast_3ba831d9.jpg",
+      "mime": "image/jpeg",
+      "size": 12277796,
+      "createdAt": "2026-05-16T16:01:13.673Z"
+    },
+    {
+      "assetId": "ast_b4b75d5d",
+      "kind": "mask",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260517\\ast_b4b75d5d.png",
+      "publicUrl": "/outputs/20260517/ast_b4b75d5d.png",
+      "mime": "image/png",
+      "size": 1576,
+      "createdAt": "2026-05-16T16:01:31.612Z"
+    },
+    {
+      "assetId": "ast_75d9512b",
+      "kind": "mask",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260517\\ast_75d9512b.png",
+      "publicUrl": "/outputs/20260517/ast_75d9512b.png",
+      "mime": "image/png",
+      "size": 1576,
+      "createdAt": "2026-05-16T16:01:49.680Z"
+    }
+  ]
+}

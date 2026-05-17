@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 
 export type PromptTemplate = {
   id: string;
@@ -9,6 +10,14 @@ export type PromptTemplate = {
   negativePrompt?: string | undefined;
   createdAt: string;
 };
+
+const templateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  prompt: z.string(),
+  negativePrompt: z.string().optional(),
+  createdAt: z.string()
+});
 
 const ROOT = process.cwd();
 const PROMPT_DIR = path.join(ROOT, "prompts");
@@ -25,8 +34,20 @@ async function ensureTemplateFile() {
 export async function listTemplates(): Promise<PromptTemplate[]> {
   await ensureTemplateFile();
   const raw = await readFile(TEMPLATE_PATH, "utf8");
-  const parsed = JSON.parse(raw) as PromptTemplate[];
-  return Array.isArray(parsed) ? parsed : [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const result: PromptTemplate[] = [];
+  for (const item of parsed) {
+    const validated = templateSchema.safeParse(item);
+    if (validated.success) {
+      result.push(validated.data);
+    }
+  }
+
+  return result;
 }
 
 export async function saveTemplate(input: {

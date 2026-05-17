@@ -1,0 +1,26 @@
+{
+  "sessionId": "s_20260516_b9b6",
+  "createdAt": "2026-05-16T06:54:49.150Z",
+  "updatedAt": "2026-05-16T06:55:14.112Z",
+  "versions": [],
+  "assets": [
+    {
+      "assetId": "ast_40291212",
+      "kind": "base",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260516\\ast_40291212.jpg",
+      "publicUrl": "/outputs/20260516/ast_40291212.jpg",
+      "mime": "image/jpeg",
+      "size": 12277796,
+      "createdAt": "2026-05-16T06:54:49.280Z"
+    },
+    {
+      "assetId": "ast_fd150979",
+      "kind": "base",
+      "path": "C:\\Users\\39859\\Documents\\Tshuabu\\outputs\\20260516\\ast_fd150979.jpg",
+      "publicUrl": "/outputs/20260516/ast_fd150979.jpg",
+      "mime": "image/jpeg",
+      "size": 12489919,
+      "createdAt": "2026-05-16T06:55:14.112Z"
+    }
+  ]
+}

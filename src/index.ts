@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateImage } from "./imageApi";
 import { createBaseEvent, createSessionId, logEvent, readLatestEvents } from "./logger";
 import { findTemplate, listTemplates, saveTemplate } from "./templates";
+import { startServer } from "./server";
 
 type Command =
   | "run:text2img"
@@ -10,7 +11,8 @@ type Command =
   | "show:latest-logs"
   | "template:save"
   | "template:list"
-  | "template:use";
+  | "template:use"
+  | "serve:web";
 
 const runText2ImgSchema = z.object({
   model: z.string().min(1),
@@ -67,6 +69,7 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 function printUsage() {
   console.log(`Usage:
+  npm run dev -- serve:web
   npm run dev -- run:text2img --model xxx --prompt "..." [--negativePrompt "..."] [--size 1024x1024] [--steps 30] [--strength 0.5] [--seed 123]
   npm run dev -- run:inpaint --model xxx --prompt "..." --inputImage outputs/base.png --maskImage outputs/mask.png
   npm run dev -- show:latest-logs [--limit 5]
@@ -228,6 +231,9 @@ async function main() {
   const args = parseArgs(rest);
 
   switch (command) {
+    case "serve:web":
+      await startServer();
+      break;
     case "run:text2img":
       await handleRunText2Img(args);
       break;

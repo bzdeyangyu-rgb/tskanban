@@ -1,0 +1,1 @@
+{"event_id":"ca919e0b-b43a-49dc-b6d7-fbb48180dcb9","timestamp":"2026-05-15T15:20:36.691Z","session_id":"s_20260515_5b50","action":"text2img","model":"test-model","prompt":"test prompt","params":{"size":"512x512","steps":10},"input_assets":[],"output_assets":[],"status":"failed","latency_ms":20,"error_message":"connect ECONNREFUSED 127.0.0.1:9"}
