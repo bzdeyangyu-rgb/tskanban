@@ -77,7 +77,7 @@ async function normalizeImageInput(input: string | undefined): Promise<string | 
   }
 }
 
-function extractOutputAssets(data: unknown): string[] {
+export function extractOutputAssets(data: unknown): string[] {
   if (!data || typeof data !== "object") {
     return [];
   }
@@ -135,6 +135,10 @@ function normalizeToStringArray(value: unknown): string[] {
           out.push(candidate);
           break;
         }
+      }
+
+      if (typeof record.b64_json === "string") {
+        out.push(`data:image/png;base64,${record.b64_json}`);
       }
     }
   }
