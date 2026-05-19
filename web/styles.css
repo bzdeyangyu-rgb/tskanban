@@ -66,14 +66,24 @@ button {
   padding: 8px 10px;
   color: #1f2937;
   background: #ffffff;
-  cursor: default;
+  cursor: pointer;
   text-align: left;
+}
+
+.node-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .node-button svg {
   width: 16px;
   height: 16px;
   color: #4f46e5;
+}
+
+.connect-button {
+  margin-top: 8px;
+  border-color: #111827;
 }
 
 .workspace {
@@ -114,6 +124,18 @@ button {
   background: #111827;
 }
 
+.run-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .muted {
   color: #64748b;
   font-size: 13px;
@@ -140,4 +162,32 @@ button {
   padding: 8px 10px;
   color: #1f2937;
   background: #ffffff;
+}
+
+.run-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #d7dfeb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.run-result.success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.run-result.failed {
+  border-color: #fecaca;
+  background: #fef2f2;
 }
