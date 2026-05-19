@@ -7,11 +7,12 @@ const envSchema = z.object({
   IMAGE_API_BASE_URL: z.string().url(),
   IMAGE_API_KEY: z.string().optional(),
   IMAGE_API_TEXT2IMG_PATH: z.string().default("/text2img"),
+  IMAGE_API_IMG2IMG_PATH: z.string().default("/img2img"),
   IMAGE_API_INPAINT_PATH: z.string().default("/inpaint"),
   IMAGE_API_TIMEOUT_MS: z.coerce.number().int().positive().default(120000)
 });
 
-export type ImageAction = "text2img" | "inpaint";
+export type ImageAction = "text2img" | "img2img" | "inpaint";
 
 export type ImageParams = {
   size?: string | undefined;
@@ -143,7 +144,12 @@ function normalizeToStringArray(value: unknown): string[] {
 
 export async function generateImage(request: ImageRequest): Promise<ImageResult> {
   const env = loadEnv();
-  const endpoint = request.action === "text2img" ? env.IMAGE_API_TEXT2IMG_PATH : env.IMAGE_API_INPAINT_PATH;
+  const endpoint =
+    request.action === "text2img"
+      ? env.IMAGE_API_TEXT2IMG_PATH
+      : request.action === "img2img"
+        ? env.IMAGE_API_IMG2IMG_PATH
+        : env.IMAGE_API_INPAINT_PATH;
   const url = `${env.IMAGE_API_BASE_URL}${normalizePath(endpoint)}`;
 
   const inputImage = await normalizeImageInput(request.inputImage);

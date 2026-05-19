@@ -1,0 +1,227 @@
+import { saveOutputAsAsset } from "../../services/assets";
+import { appendVersion, attachAsset, type CanvasSession } from "../../services/sessions";
+import { generateImage as defaultGenerateImage, type ImageRequest, type ImageResult } from "../../imageApi";
+import type { FlowRunner, RunnerOutput } from "../execute";
+import type { ExecutableNodeType, FlowNode, NodeExecutionResult } from "../types";
+
+export type ApiFlowRunnerOptions = {
+  session: CanvasSession;
+  generateImage?: (request: ImageRequest) => Promise<ImageResult>;
+};
+
+export function createApiFlowRunners(
+  options: ApiFlowRunnerOptions
+): Partial<Record<ExecutableNodeType, FlowRunner>> {
+  return {
+    api_text2img: (input) => runApiText2Img(input, options),
+    api_img2img: (input) => runApiImg2Img(input, options),
+    api_inpaint: (input) => runApiInpaint(input, options)
+  };
+}
+
+async function runApiText2Img(input: Parameters<FlowRunner>[0], options: ApiFlowRunnerOptions): Promise<RunnerOutput> {
+  const started = Date.now();
+  const model = stringData(input.node, "model");
+  const prompt = promptFrom(input.upstreamNodes, input.node);
+  const negativePrompt = optionalStringData(input.node, "negativePrompt");
+  const params = recordData(input.node, "params");
+  const result = await generate(options, {
+    action: "text2img",
+    model,
+    prompt,
+    negativePrompt,
+    params
+  });
+
+  return persistGeneratedOutputs(options.session, {
+    action: "text2img",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    result,
+    latencyMs: Date.now() - started
+  });
+}
+
+async function runApiImg2Img(input: Parameters<FlowRunner>[0], options: ApiFlowRunnerOptions): Promise<RunnerOutput> {
+  const started = Date.now();
+  const model = stringData(input.node, "model");
+  const prompt = promptFrom(input.upstreamNodes, input.node);
+  const negativePrompt = optionalStringData(input.node, "negativePrompt");
+  const params = recordData(input.node, "params");
+  const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
+
+  const result = await generate(options, {
+    action: "img2img",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    inputImage: base.path
+  });
+
+  return persistGeneratedOutputs(options.session, {
+    action: "img2img",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    result,
+    latencyMs: Date.now() - started,
+    baseAssetId: base.assetId
+  });
+}
+
+async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowRunnerOptions): Promise<RunnerOutput> {
+  const started = Date.now();
+  const model = stringData(input.node, "model");
+  const prompt = promptFrom(input.upstreamNodes, input.node);
+  const negativePrompt = optionalStringData(input.node, "negativePrompt");
+  const params = recordData(input.node, "params");
+  const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
+  const mask = findAssetById(options.session, stringData(input.node, "maskAssetId"));
+
+  const result = await generate(options, {
+    action: "inpaint",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    inputImage: base.path,
+    maskImage: mask.path
+  });
+
+  return persistGeneratedOutputs(options.session, {
+    action: "inpaint",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    result,
+    latencyMs: Date.now() - started,
+    baseAssetId: base.assetId,
+    maskAssetId: mask.assetId
+  });
+}
+
+async function generate(options: ApiFlowRunnerOptions, request: ImageRequest): Promise<ImageResult> {
+  const generateImage = options.generateImage ?? defaultGenerateImage;
+  return generateImage(request);
+}
+
+async function persistGeneratedOutputs(
+  session: CanvasSession,
+  input: {
+    action: "text2img" | "img2img" | "inpaint";
+    model: string;
+    prompt: string;
+    negativePrompt?: string | undefined;
+    params?: Record<string, unknown> | undefined;
+    result: ImageResult;
+    latencyMs: number;
+    baseAssetId?: string | undefined;
+    maskAssetId?: string | undefined;
+  }
+): Promise<RunnerOutput> {
+  if (input.result.outputAssets.length === 0) {
+    throw new Error(`${input.action} returned no output assets`);
+  }
+
+  const outputAssets = await Promise.all(
+    input.result.outputAssets.map((output) => saveOutputAsAsset({ output, kind: "generated" }))
+  );
+
+  for (const asset of outputAssets) {
+    attachAsset(session, asset);
+  }
+
+  const version = appendVersion(session, {
+    action: input.action,
+    model: input.model,
+    prompt: input.prompt,
+    negativePrompt: input.negativePrompt,
+    params: input.params ?? {},
+    baseAssetId: input.baseAssetId,
+    maskAssetId: input.maskAssetId,
+    outputAssetIds: outputAssets.map((asset) => asset.assetId),
+    selectedOutputAssetId: outputAssets[0]?.assetId,
+    latencyMs: input.latencyMs,
+    status: "success"
+  });
+
+  return {
+    outputAssetIds: outputAssets.map((asset) => asset.assetId),
+    outputAssets: outputAssets.map((asset) => ({ assetId: asset.assetId, url: asset.publicUrl })),
+    data: {
+      versionId: version.versionId,
+      raw: input.result.raw
+    }
+  };
+}
+
+function stringData(node: FlowNode, key: string): string {
+  const value = node.data[key];
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  throw new Error(`${node.id} missing required data.${key}`);
+}
+
+function optionalStringData(node: FlowNode, key: string): string | undefined {
+  const value = node.data[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function recordData(node: FlowNode, key: string): Record<string, unknown> | undefined {
+  const value = node.data[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function promptFrom(upstreamNodes: FlowNode[], node: FlowNode): string {
+  const direct = optionalStringData(node, "prompt");
+  if (direct) {
+    return direct;
+  }
+
+  const promptNode = upstreamNodes.find((upstream) => upstream.type === "prompt");
+  if (promptNode) {
+    return stringData(promptNode, "text");
+  }
+
+  throw new Error(`${node.id} requires an upstream prompt node or data.prompt`);
+}
+
+function findInputAsset(
+  session: CanvasSession,
+  upstreamNodes: FlowNode[],
+  upstreamResults: NodeExecutionResult[],
+  node: FlowNode,
+  dataKey: string
+) {
+  const explicit = optionalStringData(node, dataKey);
+  if (explicit) {
+    return findAssetById(session, explicit);
+  }
+
+  const upstreamImage = upstreamNodes.find((upstream) => upstream.type === "image");
+  const upstreamImageAssetId = upstreamImage ? optionalStringData(upstreamImage, "assetId") : undefined;
+  if (upstreamImageAssetId) {
+    return findAssetById(session, upstreamImageAssetId);
+  }
+
+  const upstreamGeneratedAssetId = upstreamResults.flatMap((result) => result.outputAssetIds)[0];
+  if (upstreamGeneratedAssetId) {
+    return findAssetById(session, upstreamGeneratedAssetId);
+  }
+
+  throw new Error(`${node.id} requires an input image asset`);
+}
+
+function findAssetById(session: CanvasSession, assetId: string) {
+  const asset = session.assets.find((item) => item.assetId === assetId);
+  if (!asset) {
+    throw new Error(`asset not found in session: ${assetId}`);
+  }
+  return asset;
+}

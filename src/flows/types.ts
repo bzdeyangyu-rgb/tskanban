@@ -57,5 +57,6 @@ export type NodeExecutionResult = {
   attempts: number;
   latencyMs: number;
   outputAssetIds: string[];
+  outputAssets?: Array<{ assetId: string; url: string }> | undefined;
   errorMessage?: string | undefined;
 };

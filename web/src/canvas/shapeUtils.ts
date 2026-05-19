@@ -1,4 +1,4 @@
-import { createShapeId, toRichText, type Editor, type TLShapePartial, type TLGeoShape } from "tldraw";
+import { createShapeId, toRichText, type Editor, type TLGeoShape, type TLImageShape, type TLShapePartial } from "tldraw";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./flowTypes";
 
 export type TshuabuNodeMeta = {
@@ -37,6 +37,16 @@ export function isTshuabuNodeMeta(meta: unknown): meta is TshuabuNodeMeta {
 
   const candidate = meta as Partial<TshuabuNodeMeta>;
   return candidate.kind === "tshuabu-node" && typeof candidate.nodeType === "string" && typeof candidate.title === "string";
+}
+
+export function mergeNodeData(meta: TshuabuNodeMeta, patch: Record<string, unknown>): TshuabuNodeMeta {
+  return {
+    ...meta,
+    data: {
+      ...meta.data,
+      ...patch
+    }
+  };
 }
 
 export function createNodeShape(definition: NodeDefinition, x: number, y: number): TLShapePartial<TLGeoShape> {
@@ -88,4 +98,40 @@ export function addNodeToEditor(editor: Editor, definition: NodeDefinition, plac
   }
   editor.setCurrentTool("select");
   return String(shape.id);
+}
+
+export function addOutputImagesToEditor(
+  editor: Editor,
+  outputs: Array<{ assetId: string; url: string }>
+): void {
+  if (outputs.length === 0) {
+    return;
+  }
+
+  const bounds = editor.getViewportPageBounds();
+  const shapes = outputs.map((output, index): TLShapePartial<TLImageShape> => ({
+    id: createShapeId(),
+    type: "image",
+    x: bounds.x + 120 + index * 280,
+    y: bounds.y + 360,
+    meta: {
+      kind: "tshuabu-output",
+      assetId: output.assetId
+    },
+    props: {
+      w: 240,
+      h: 240,
+      url: output.url,
+      assetId: null,
+      crop: null,
+      flipX: false,
+      flipY: false,
+      playing: true,
+      altText: output.assetId
+    }
+  }));
+
+  editor.createShapes(shapes);
+  editor.select(...shapes.map((shape) => shape.id).filter(Boolean));
+  editor.setCurrentTool("select");
 }

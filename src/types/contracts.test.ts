@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasExecuteSchema, canvasSnapshotSchema } from "./contracts";
+import { canvasExecuteSchema, canvasSnapshotSchema, img2imgSchema } from "./contracts";
 
 describe("canvas snapshot contracts", () => {
   it("accepts the phase-one node types and reserved future node types", () => {
@@ -108,5 +108,20 @@ describe("canvas snapshot contracts", () => {
 
     expect(request.flow.canvasId).toBe("c_1");
     expect(request.targetNodeId).toBe("output_1");
+  });
+
+  it("accepts img2img API relay requests", () => {
+    const request = img2imgSchema.parse({
+      sessionId: "s_1",
+      parentVersionId: "v_1",
+      baseAssetId: "asset_base",
+      prompt: "keep composition, warmer light",
+      negativePrompt: "blur",
+      model: "image-model",
+      params: { strength: 0.45 }
+    });
+
+    expect(request.baseAssetId).toBe("asset_base");
+    expect(request.params?.strength).toBe(0.45);
   });
 });

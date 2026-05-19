@@ -164,6 +164,23 @@ button {
   background: #ffffff;
 }
 
+.field-control {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #d7dfeb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1f2937;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.field-textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
 .run-results {
   display: grid;
   gap: 8px;

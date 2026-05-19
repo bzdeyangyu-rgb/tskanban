@@ -7,6 +7,7 @@ export type FlowExecutionNode = {
   attempts: number;
   latencyMs: number;
   outputAssetIds: string[];
+  outputAssets?: Array<{ assetId: string; url: string }>;
   errorMessage?: string;
 };
 
@@ -14,6 +15,7 @@ export type FlowExecutionResponse = {
   sessionId: string;
   flowId: string;
   nodes: FlowExecutionNode[];
+  outputAssets: Array<{ assetId: string; url: string }>;
 };
 
 export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecutionResponse> {

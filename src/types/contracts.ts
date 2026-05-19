@@ -40,6 +40,16 @@ export const inpaintSchema = z.object({
     .optional()
 });
 
+export const img2imgSchema = z.object({
+  sessionId: z.string().optional(),
+  parentVersionId: z.string().optional(),
+  baseAssetId: z.string().min(1),
+  prompt: z.string().min(1),
+  negativePrompt: z.string().optional(),
+  model: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).optional()
+});
+
 export const canvasNodeTypeSchema = z.enum([
   "image",
   "prompt",

@@ -9,6 +9,7 @@ export type CompiledNodeInputs = {
 
 export type RunnerOutput = {
   outputAssetIds: string[];
+  outputAssets?: Array<{ assetId: string; url: string }> | undefined;
   data?: Record<string, unknown> | undefined;
 };
 
@@ -84,7 +85,8 @@ export async function executeFlowSnapshot(
           status: "success",
           attempts: attempt,
           started,
-          outputAssetIds: output.outputAssetIds
+          outputAssetIds: output.outputAssetIds,
+          outputAssets: output.outputAssets
         });
         results.push(success);
         resultsByNodeId.set(node.id, success);
@@ -146,6 +148,7 @@ function createResult(input: {
   attempts: number;
   started: number;
   outputAssetIds: string[];
+  outputAssets?: Array<{ assetId: string; url: string }> | undefined;
   errorMessage?: string | undefined;
 }): NodeExecutionResult {
   return {
@@ -155,6 +158,7 @@ function createResult(input: {
     attempts: input.attempts,
     latencyMs: Date.now() - input.started,
     outputAssetIds: input.outputAssetIds,
+    outputAssets: input.outputAssets,
     errorMessage: input.errorMessage
   };
 }

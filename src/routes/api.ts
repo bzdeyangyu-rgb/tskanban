@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import {
   text2imgSchema,
+  img2imgSchema,
   inpaintSchema,
   uploadBodySchema,
   createSessionSchema,
@@ -19,7 +20,8 @@ import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger"
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
 import { validateFlowSnapshot } from "../flows/validate";
 import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
-import { executeFlowSnapshot, type FlowRunner } from "../flows/execute";
+import { executeFlowSnapshot } from "../flows/execute";
+import { createApiFlowRunners } from "../flows/runners/api";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -203,6 +205,99 @@ apiRouter.post("/text2img", async (req, res) => {
         ...createBaseEvent({
           sessionId,
           action: "text2img",
+          model: (req.body?.model as string) ?? "unknown",
+          prompt: (req.body?.prompt as string) ?? "",
+          negativePrompt: req.body?.negativePrompt as string | undefined,
+          params: (req.body?.params as Record<string, unknown>) ?? {}
+        }),
+        output_assets: [],
+        status: "failed",
+        latency_ms: Date.now() - started,
+        error_message: message
+      });
+    }
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/img2img", async (req, res) => {
+  let sessionId = "";
+  const started = Date.now();
+  try {
+    const input = img2imgSchema.parse(req.body ?? {});
+    const session = await getOrCreateSession(input.sessionId);
+    sessionId = session.sessionId;
+
+    const base = session.assets.find((asset) => asset.assetId === input.baseAssetId);
+    if (!base) {
+      res.status(400).json({ ok: false, error: "baseAssetId not found in session" });
+      return;
+    }
+
+    const result = await generateImage({
+      action: "img2img",
+      model: input.model,
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      params: input.params,
+      inputImage: base.path
+    });
+
+    const outputAssets = await Promise.all(
+      result.outputAssets.map((output) => saveOutputAsAsset({ output, kind: "generated" }))
+    );
+
+    for (const asset of outputAssets) {
+      attachAsset(session, asset);
+    }
+
+    const version = appendVersion(session, {
+      parentVersionId: input.parentVersionId,
+      action: "img2img",
+      model: input.model,
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      params: input.params ?? {},
+      baseAssetId: input.baseAssetId,
+      outputAssetIds: outputAssets.map((asset) => asset.assetId),
+      selectedOutputAssetId: outputAssets[0]?.assetId,
+      latencyMs: Date.now() - started,
+      status: "success"
+    });
+
+    await saveSession(session);
+
+    await logEvent({
+      ...createBaseEvent({
+        sessionId: session.sessionId,
+        action: "img2img",
+        model: input.model,
+        prompt: input.prompt,
+        negativePrompt: input.negativePrompt,
+        params: input.params,
+        inputAssets: [base.publicUrl]
+      }),
+      output_assets: outputAssets.map((asset) => asset.publicUrl),
+      status: "success",
+      latency_ms: Date.now() - started
+    });
+
+    res.json({
+      ok: true,
+      data: {
+        sessionId: session.sessionId,
+        versionId: version.versionId,
+        outputAssets: outputAssets.map((asset) => ({ assetId: asset.assetId, url: asset.publicUrl })),
+        raw: result.raw
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (sessionId) {
+      await logEvent({
+        ...createBaseEvent({
+          sessionId,
+          action: "img2img",
           model: (req.body?.model as string) ?? "unknown",
           prompt: (req.body?.prompt as string) ?? "",
           negativePrompt: req.body?.negativePrompt as string | undefined,
@@ -415,12 +510,13 @@ apiRouter.post("/flows/execute", async (req, res) => {
   try {
     const input = canvasExecuteSchema.parse(req.body ?? {});
     const session = await getOrCreateSession(input.sessionId ?? input.flow.sessionId);
-    const runners = createFakeFlowRunners(flowId);
+    const runners = createApiFlowRunners({ session });
     const result = await executeFlowSnapshot(input.flow, {
       sessionId: session.sessionId,
       targetNodeId: input.targetNodeId,
       runners
     });
+    await saveSession(session);
 
     await logEvent({
       ...createBaseEvent({
@@ -440,7 +536,7 @@ apiRouter.post("/flows/execute", async (req, res) => {
         nodes: input.flow.nodes.map((node) => `${node.id}:${node.type}`),
         edges: input.flow.edges.map((edge) => ({ from: edge.from, to: edge.to }))
       },
-      output_assets: result.nodes.flatMap((node) => node.outputAssetIds),
+      output_assets: result.nodes.flatMap((node) => (node.outputAssets ?? []).map((asset) => asset.url)),
       status: result.ok ? "success" : "failed",
       latency_ms: Date.now() - started,
       error_message: result.error
@@ -452,7 +548,8 @@ apiRouter.post("/flows/execute", async (req, res) => {
       data: {
         sessionId: session.sessionId,
         flowId,
-        nodes: result.nodes
+        nodes: result.nodes,
+        outputAssets: result.nodes.flatMap((node) => node.outputAssets ?? [])
       }
     });
   } catch (error) {
@@ -829,26 +926,6 @@ function validateFlow(flow: Flow): { valid: boolean; errors: string[]; order: st
     valid: errors.length === 0,
     errors,
     order
-  };
-}
-
-function createFakeFlowRunners(flowId: string): Partial<Record<"api_text2img" | "api_img2img" | "api_inpaint" | "comfy" | "llm" | "video", FlowRunner>> {
-  const fakeRunner: FlowRunner = async (input) => ({
-    outputAssetIds: [`fake_${flowId}_${input.node.id}`],
-    data: {
-      nodeId: input.node.id,
-      nodeType: input.node.type,
-      upstreamNodeIds: input.upstreamNodes.map((node) => node.id)
-    }
-  });
-
-  return {
-    api_text2img: fakeRunner,
-    api_img2img: fakeRunner,
-    api_inpaint: fakeRunner,
-    comfy: fakeRunner,
-    llm: fakeRunner,
-    video: fakeRunner
   };
 }
 

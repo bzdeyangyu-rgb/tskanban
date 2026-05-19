@@ -6,7 +6,7 @@ import type { AssetMeta } from "./assets";
 export type CanvasVersion = {
   versionId: string;
   parentVersionId?: string | undefined;
-  action: "text2img" | "inpaint";
+  action: "text2img" | "img2img" | "inpaint";
   model: string;
   prompt: string;
   negativePrompt?: string | undefined;
