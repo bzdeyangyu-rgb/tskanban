@@ -8,6 +8,7 @@ import {
   logsQuerySchema,
   flowValidateSchema,
   flowExecuteSchema,
+  canvasExecuteSchema,
   createCanvasSchema,
   saveCanvasSchema
 } from "../types/contracts";
@@ -18,6 +19,7 @@ import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger"
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
 import { validateFlowSnapshot } from "../flows/validate";
 import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
+import { executeFlowSnapshot, type FlowRunner } from "../flows/execute";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -407,6 +409,59 @@ apiRouter.get("/canvases/:canvasId", async (req, res) => {
 });
 
 apiRouter.post("/flows/execute", async (req, res) => {
+  const flowId = createFlowId();
+  const started = Date.now();
+
+  try {
+    const input = canvasExecuteSchema.parse(req.body ?? {});
+    const session = await getOrCreateSession(input.sessionId ?? input.flow.sessionId);
+    const runners = createFakeFlowRunners(flowId);
+    const result = await executeFlowSnapshot(input.flow, {
+      sessionId: session.sessionId,
+      targetNodeId: input.targetNodeId,
+      runners
+    });
+
+    await logEvent({
+      ...createBaseEvent({
+        sessionId: session.sessionId,
+        action: "flow_execute",
+        model: "fake",
+        prompt: "execute_canvas_flow",
+        params: {
+          canvasId: input.flow.canvasId,
+          targetNodeId: input.targetNodeId,
+          ok: result.ok
+        },
+        inputAssets: []
+      }),
+      flow_id: flowId,
+      flow_structure: {
+        nodes: input.flow.nodes.map((node) => `${node.id}:${node.type}`),
+        edges: input.flow.edges.map((edge) => ({ from: edge.from, to: edge.to }))
+      },
+      output_assets: result.nodes.flatMap((node) => node.outputAssetIds),
+      status: result.ok ? "success" : "failed",
+      latency_ms: Date.now() - started,
+      error_message: result.error
+    });
+
+    res.status(result.ok ? 200 : 500).json({
+      ok: result.ok,
+      error: result.error,
+      data: {
+        sessionId: session.sessionId,
+        flowId,
+        nodes: result.nodes
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/flows/execute-legacy", async (req, res) => {
   let sessionId = "";
   const flowId = createFlowId();
   const started = Date.now();
@@ -774,6 +829,26 @@ function validateFlow(flow: Flow): { valid: boolean; errors: string[]; order: st
     valid: errors.length === 0,
     errors,
     order
+  };
+}
+
+function createFakeFlowRunners(flowId: string): Partial<Record<"api_text2img" | "api_img2img" | "api_inpaint" | "comfy" | "llm" | "video", FlowRunner>> {
+  const fakeRunner: FlowRunner = async (input) => ({
+    outputAssetIds: [`fake_${flowId}_${input.node.id}`],
+    data: {
+      nodeId: input.node.id,
+      nodeType: input.node.type,
+      upstreamNodeIds: input.upstreamNodes.map((node) => node.id)
+    }
+  });
+
+  return {
+    api_text2img: fakeRunner,
+    api_img2img: fakeRunner,
+    api_inpaint: fakeRunner,
+    comfy: fakeRunner,
+    llm: fakeRunner,
+    video: fakeRunner
   };
 }
 
