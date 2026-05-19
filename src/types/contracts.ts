@@ -40,6 +40,73 @@ export const inpaintSchema = z.object({
     .optional()
 });
 
+export const canvasNodeTypeSchema = z.enum([
+  "image",
+  "prompt",
+  "api_text2img",
+  "api_img2img",
+  "api_inpaint",
+  "output",
+  "comfy",
+  "llm",
+  "loop",
+  "video"
+]);
+
+export const canvasNodeStatusSchema = z.enum(["idle", "queued", "running", "success", "failed", "retrying"]);
+
+export const canvasNodeSchema = z.object({
+  id: z.string().min(1),
+  type: canvasNodeTypeSchema,
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  data: z.record(z.string(), z.unknown()).default({}),
+  status: canvasNodeStatusSchema.optional()
+});
+
+export const canvasEdgeSchema = z.object({
+  id: z.string().min(1),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  fromHandle: z.string().optional(),
+  toHandle: z.string().optional()
+});
+
+export const canvasViewportSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  zoom: z.number().positive()
+});
+
+export const canvasSnapshotSchema = z.object({
+  canvasId: z.string().min(1),
+  sessionId: z.string().optional(),
+  nodes: z.array(canvasNodeSchema).min(1),
+  edges: z.array(canvasEdgeSchema),
+  viewport: canvasViewportSchema,
+  selectedNodeId: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional()
+});
+
+export const canvasExecuteSchema = z.object({
+  sessionId: z.string().optional(),
+  targetNodeId: z.string().optional(),
+  flow: canvasSnapshotSchema
+});
+
+export const createCanvasSchema = z.object({
+  canvasId: z.string().min(1).optional(),
+  sessionId: z.string().optional(),
+  title: z.string().min(1).optional()
+});
+
+export const saveCanvasSchema = canvasSnapshotSchema.extend({
+  title: z.string().min(1).default("未命名画布")
+});
+
 export const flowNodeTypeSchema = z.enum([
   "asset_base",
   "asset_style",
@@ -90,7 +157,7 @@ export const flowRunSchema = z.object({
 });
 
 export const flowValidateSchema = z.object({
-  flow: flowSchema
+  flow: canvasSnapshotSchema
 });
 
 export const flowExecuteSchema = z.object({

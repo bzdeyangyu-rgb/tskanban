@@ -7,13 +7,17 @@ import {
   createSessionSchema,
   logsQuerySchema,
   flowValidateSchema,
-  flowExecuteSchema
+  flowExecuteSchema,
+  createCanvasSchema,
+  saveCanvasSchema
 } from "../types/contracts";
 import { isSupportedImageMime, saveBufferAsAsset, saveOutputAsAsset } from "../services/assets";
 import { appendVersion, attachAsset, createSession, getOrCreateSession, loadSession, saveSession } from "../services/sessions";
 import { generateImage } from "../imageApi";
 import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger";
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
+import { validateFlowSnapshot } from "../flows/validate";
+import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -335,7 +339,7 @@ apiRouter.post("/inpaint", async (req, res) => {
 apiRouter.post("/flows/validate", async (req, res) => {
   try {
     const input = flowValidateSchema.parse(req.body ?? {});
-    const validation = validateFlow(input.flow);
+    const validation = validateFlowSnapshot(input.flow);
 
     await logEvent({
       ...createBaseEvent({
@@ -353,7 +357,7 @@ apiRouter.post("/flows/validate", async (req, res) => {
       flow_id: createFlowId(),
       flow_structure: {
         nodes: input.flow.nodes.map((n) => `${n.id}:${n.type}`),
-        edges: input.flow.edges
+        edges: input.flow.edges.map((edge) => ({ from: edge.from, to: edge.to }))
       },
       output_assets: [],
       status: validation.valid ? "success" : "failed",
@@ -364,6 +368,41 @@ apiRouter.post("/flows/validate", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/canvases", async (req, res) => {
+  try {
+    const input = createCanvasSchema.parse(req.body ?? {});
+    const canvas = await createCanvas(input);
+    res.json({ ok: true, data: canvas });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.put("/canvases/:canvasId", async (req, res) => {
+  try {
+    const input = saveCanvasSchema.parse({
+      ...(req.body ?? {}),
+      canvasId: req.params.canvasId
+    });
+    const canvas = await saveCanvas(input);
+    res.json({ ok: true, data: canvas });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.get("/canvases/:canvasId", async (req, res) => {
+  try {
+    const canvas = await loadCanvas(req.params.canvasId);
+    res.json({ ok: true, data: canvas });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(404).json({ ok: false, error: message });
   }
 });
 

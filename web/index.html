@@ -3,102 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Tshuabu 图像创作工作台</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <title>Tshuabu 图像节点工作台</title>
+    <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>
-    <div class="layout">
-      <aside class="panel left">
-        <h2>创作参数</h2>
-        <label>会话 ID
-          <input id="sessionId" placeholder="自动创建" />
-        </label>
-        <label>模型
-          <input id="model" placeholder="输入模型名" />
-        </label>
-        <label>提示词
-          <textarea id="prompt" rows="4"></textarea>
-        </label>
-        <label>局部提示词（可选）
-          <textarea id="localPrompt" rows="2" placeholder="用于局部重绘"></textarea>
-        </label>
-        <label>反向提示词
-          <textarea id="negativePrompt" rows="2"></textarea>
-        </label>
-        <label>步数
-          <input id="steps" type="number" value="30" />
-        </label>
-        <label>重绘强度
-          <input id="strength" type="number" min="0" max="1" step="0.01" value="0.5" />
-        </label>
-        <label>尺寸
-          <input id="size" value="1024x1024" />
-        </label>
-        <div class="buttons two">
-          <button id="runText2Img">文生图</button>
-          <button id="runInpaint" class="primary">局部重绘</button>
-        </div>
-        <div class="buttons two">
-          <button id="validateFlow">校验流程</button>
-          <button id="runFlow" class="primary">运行流程</button>
-        </div>
-
-        <label>上传底图
-          <input id="uploadBase" type="file" accept="image/png,image/jpeg,image/webp" />
-        </label>
-        <label>上传风格图
-          <input id="uploadStyle" type="file" accept="image/png,image/jpeg,image/webp" />
-        </label>
-        <label>导入文件夹（兜底）
-          <input id="uploadFolder" type="file" accept="image/png,image/jpeg,image/webp" webkitdirectory directory multiple />
-        </label>
-        <p class="tip">支持拖拽图片/文件夹到画布，或直接 Ctrl+V 粘贴截图。</p>
-
-        <div class="buttons two">
-          <button id="saveTemplate">保存模板</button>
-          <button id="loadTemplates">加载模板</button>
-        </div>
-        <select id="templateSelect"></select>
-        <button id="applyTemplate">应用模板</button>
-      </aside>
-
-      <main class="canvas-area">
-        <div class="toolbar">
-          <button id="toolBrush" class="active">画笔</button>
-          <button id="toolEraser">橡皮</button>
-          <label>画笔大小 <input id="brushSize" type="range" min="5" max="120" value="36" /></label>
-          <button id="setAsBase">设为底图</button>
-          <button id="setAsStyle">设为风格图</button>
-          <button id="clearMask">清空蒙版</button>
-          <button id="exportMask">提交蒙版</button>
-          <button id="exportCurrent">导出当前图</button>
-          <div class="zoom-controls">
-            <button id="zoomOut" type="button">-</button>
-            <button id="zoomReset" type="button">100%</button>
-            <button id="zoomIn" type="button">+</button>
-          </div>
-          <span id="status">就绪</span>
-        </div>
-
-        <div class="node-editor" id="nodeEditor">
-          <svg id="flowEdges" class="flow-edges"></svg>
-          <div id="flowNodes" class="flow-nodes"></div>
-        </div>
-
-        <div class="stage" id="stage">
-          <div class="world" id="world"></div>
-        </div>
-      </main>
-
-      <aside class="panel right">
-        <h2>版本历史</h2>
-        <ul id="history"></ul>
-        <h3>最近日志</h3>
-        <button id="refreshLogs">刷新日志</button>
-        <pre id="logOutput"></pre>
-      </aside>
-    </div>
-
-    <script src="/app.js" defer></script>
+    <div id="root"></div>
   </body>
 </html>

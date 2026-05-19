@@ -4,10 +4,12 @@
   "description": "Tshuabu image workstation MVP",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && vite build",
+    "build:server": "tsc",
     "dev": "tsx src/index.ts",
+    "dev:web": "vite --host 127.0.0.1",
     "start": "node dist/index.js",
-    "test": "echo \"No tests yet\""
+    "test": "vitest run --config vitest.config.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,14 +19,23 @@
     "axios": "^1.16.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "lucide-react": "^0.468.0",
     "multer": "^2.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tldraw": "^3.15.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.8.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "tsx": "^4.22.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
   }
 }
