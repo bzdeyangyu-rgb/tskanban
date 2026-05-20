@@ -27,6 +27,12 @@ describe("canvas storage", () => {
     expect(canvas.updatedAt).toBeTruthy();
   });
 
+  it("uses a readable default title for new canvases", async () => {
+    const canvas = await createCanvas({ canvasId: "c_test_canvas" });
+
+    expect(canvas.title).toBe("未命名画布");
+  });
+
   it("saves and loads a full canvas worksite", async () => {
     const saved = await saveCanvas({
       canvasId: "c_test_canvas",
