@@ -123,6 +123,12 @@ export type FlowExecutionResponse = {
   run: CanvasRunRecord;
 };
 
+export type StoredCanvas = CanvasSnapshot & {
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecutionResponse> {
   const response = await fetch("/api/flows/execute", {
     method: "POST",
@@ -139,6 +145,31 @@ export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecu
   }
 
   return json.data as FlowExecutionResponse;
+}
+
+export async function saveCanvasSnapshot(flow: CanvasSnapshot, title = "画布"): Promise<StoredCanvas> {
+  const response = await fetch(`/api/canvases/${encodeURIComponent(flow.canvasId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...flow,
+      title
+    })
+  });
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "保存画布失败");
+  }
+  return json.data as StoredCanvas;
+}
+
+export async function loadCanvasSnapshot(canvasId: string): Promise<StoredCanvas> {
+  const response = await fetch(`/api/canvases/${encodeURIComponent(canvasId)}`);
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "读取画布失败");
+  }
+  return json.data as StoredCanvas;
 }
 
 export async function fetchSession(sessionId: string): Promise<CanvasSession> {

@@ -4,6 +4,8 @@ import {
   executeCanvasFlow,
   fetchProviders,
   fetchSession,
+  loadCanvasSnapshot,
+  saveCanvasSnapshot,
   type ApiProvider,
   type CanvasSession,
   type FlowExecutionNode
@@ -16,9 +18,11 @@ import {
   addOutputImagesToEditor,
   isTshuabuNodeMeta,
   mergeNodeData,
+  restoreCanvasSnapshot,
   type TshuabuNodeMeta
 } from "./canvas/shapeUtils";
 import { ApiSettings } from "./panels/ApiSettings";
+import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunPanel } from "./panels/RunPanel";
@@ -36,8 +40,17 @@ export function App() {
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [session, setSession] = useState<CanvasSession | null>(null);
+  const [savedAt, setSavedAt] = useState("");
   const placementIndexRef = useRef(0);
-  const canvasId = useMemo(() => `c_web_${Date.now().toString(36)}`, []);
+  const canvasId = useMemo(() => {
+    const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
+    if (existing) {
+      return existing;
+    }
+    const next = `c_web_${Date.now().toString(36)}`;
+    window.localStorage.setItem("tshuabu:lastCanvasId", next);
+    return next;
+  }, []);
 
   useEffect(() => {
     fetchProviders()
@@ -129,7 +142,7 @@ export function App() {
     }
 
     try {
-      const snapshot = compileCanvasSnapshot(editor, canvasId);
+      const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
       if (snapshot.nodes.length === 0) {
         setStatus("请先添加节点");
         return;
@@ -138,9 +151,45 @@ export function App() {
       setStatus(`提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`);
       const result = await executeCanvasFlow(snapshot);
       setLastRunNodes(result.nodes);
-      setSession(await fetchSession(result.sessionId));
+      const nextSession = await fetchSession(result.sessionId);
+      setSession(nextSession);
       addOutputImagesToEditor(editor, result.outputAssets);
       setStatus(`执行完成：${result.nodes.length} 个节点有状态`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  }, [canvasId, editor, session?.sessionId]);
+
+  const handleSaveCanvas = useCallback(async () => {
+    if (!editor) {
+      setStatus("画布还在加载");
+      return;
+    }
+
+    try {
+      const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
+      const saved = await saveCanvasSnapshot(snapshot, "当前画布");
+      setSavedAt(new Date(saved.updatedAt).toLocaleString());
+      setStatus(`画布已保存：${saved.canvasId}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    }
+  }, [canvasId, editor, session?.sessionId]);
+
+  const handleLoadCanvas = useCallback(async () => {
+    if (!editor) {
+      setStatus("画布还在加载");
+      return;
+    }
+
+    try {
+      const saved = await loadCanvasSnapshot(canvasId);
+      restoreCanvasSnapshot(editor, saved);
+      setSavedAt(new Date(saved.updatedAt).toLocaleString());
+      if (saved.sessionId) {
+        setSession(await fetchSession(saved.sessionId));
+      }
+      setStatus(`画布已读取：${saved.canvasId}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -162,6 +211,12 @@ export function App() {
           runNodes={lastRunNodes}
           selectedNode={selectedNode}
           onUpdateSelectedNode={handleUpdateSelectedNode}
+        />
+        <CanvasPersistenceBar
+          canvasId={canvasId}
+          savedAt={savedAt}
+          onLoad={handleLoadCanvas}
+          onSave={handleSaveCanvas}
         />
         <RunHistory session={session} />
       </aside>

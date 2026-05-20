@@ -95,6 +95,20 @@ button {
   border-top: 1px solid #d9e1ec;
 }
 
+.persistence-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #d9e1ec;
+}
+
+.persistence-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .api-settings-head {
   display: flex;
   align-items: center;

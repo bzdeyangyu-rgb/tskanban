@@ -1,5 +1,18 @@
-import { createShapeId, toRichText, type Editor, type TLGeoShape, type TLImageShape, type TLShapePartial } from "tldraw";
+import {
+  createBindingId,
+  createShapeId,
+  toRichText,
+  type Editor,
+  type TLArrowBinding,
+  type TLArrowShape,
+  type TLBindingCreate,
+  type TLGeoShape,
+  type TLImageShape,
+  type TLShapeId,
+  type TLShapePartial
+} from "tldraw";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./flowTypes";
+import type { CanvasSnapshot } from "./flowTypes";
 
 export type TshuabuNodeMeta = {
   kind: "tshuabu-node";
@@ -49,7 +62,7 @@ export function mergeNodeData(meta: TshuabuNodeMeta, patch: Record<string, unkno
   };
 }
 
-export function createNodeShape(definition: NodeDefinition, x: number, y: number): TLShapePartial<TLGeoShape> {
+export function createNodeShape(definition: NodeDefinition, x: number, y: number, id?: TLShapeId): TLShapePartial<TLGeoShape> {
   const width = definition.width ?? 260;
   const height = definition.height ?? 140;
   const meta: TshuabuNodeMeta = {
@@ -61,7 +74,7 @@ export function createNodeShape(definition: NodeDefinition, x: number, y: number
   };
 
   return {
-    id: createShapeId(),
+    id: id ?? createShapeId(),
     type: "geo",
     x,
     y,
@@ -134,4 +147,145 @@ export function addOutputImagesToEditor(
   editor.createShapes(shapes);
   editor.select(...shapes.map((shape) => shape.id).filter(Boolean));
   editor.setCurrentTool("select");
+}
+
+export function canvasSnapshotToEditorContent(snapshot: CanvasSnapshot): {
+  shapes: Array<TLShapePartial<TLGeoShape> | TLShapePartial<TLArrowShape>>;
+  bindings: TLBindingCreate<TLArrowBinding>[];
+} {
+  const shapes: Array<TLShapePartial<TLGeoShape> | TLShapePartial<TLArrowShape>> = snapshot.nodes.map((node) => {
+    const shape = createNodeShape(
+      {
+        type: node.type,
+        title: titleForNode(node.type),
+        data: node.data,
+        width: node.width,
+        height: node.height
+      },
+      node.x,
+      node.y,
+      toShapeId(node.id)
+    );
+    return {
+      ...shape,
+      meta: {
+        ...(shape.meta as TshuabuNodeMeta),
+        status: node.status ?? "idle"
+      }
+    };
+  });
+
+  const bindings: TLBindingCreate<TLArrowBinding>[] = [];
+
+  for (const edge of snapshot.edges) {
+    const from = snapshot.nodes.find((node) => node.id === edge.from);
+    const to = snapshot.nodes.find((node) => node.id === edge.to);
+    if (!from || !to) {
+      continue;
+    }
+
+    const arrowId = toShapeId(edge.id);
+    shapes.push({
+      id: arrowId,
+      type: "arrow",
+      x: from.x + from.width,
+      y: from.y + from.height / 2,
+      props: {
+        kind: "arc",
+        labelColor: "black",
+        color: "black",
+        fill: "none",
+        dash: "solid",
+        size: "m",
+        arrowheadStart: "none",
+        arrowheadEnd: "arrow",
+        font: "sans",
+        start: { x: 0, y: 0 },
+        end: { x: Math.max(80, to.x - from.x), y: to.y - from.y },
+        bend: 0,
+        text: "",
+        labelPosition: 0.5,
+        scale: 1,
+        elbowMidPoint: 0.5
+      }
+    });
+
+    bindings.push(
+      {
+        id: createBindingId(`${stripRecordPrefix(edge.id)}-start`),
+        type: "arrow",
+        fromId: arrowId,
+        toId: toShapeId(edge.from),
+        props: {
+          terminal: "start",
+          normalizedAnchor: { x: 0.5, y: 0.5 },
+          isExact: false,
+          isPrecise: false
+        }
+      },
+      {
+        id: createBindingId(`${stripRecordPrefix(edge.id)}-end`),
+        type: "arrow",
+        fromId: arrowId,
+        toId: toShapeId(edge.to),
+        props: {
+          terminal: "end",
+          normalizedAnchor: { x: 0.5, y: 0.5 },
+          isExact: false,
+          isPrecise: false
+        }
+      }
+    );
+  }
+
+  return { shapes, bindings };
+}
+
+export function restoreCanvasSnapshot(editor: Editor, snapshot: CanvasSnapshot): void {
+  const current = editor.getCurrentPageShapes();
+  if (current.length > 0) {
+    editor.deleteShapes(current.map((shape) => shape.id));
+  }
+
+  const content = canvasSnapshotToEditorContent(snapshot);
+  if (content.shapes.length > 0) {
+    editor.createShapes(content.shapes);
+  }
+  if (content.bindings.length > 0) {
+    editor.createBindings(content.bindings);
+  }
+  editor.setCamera({ x: snapshot.viewport.x, y: snapshot.viewport.y, z: snapshot.viewport.zoom });
+  if (snapshot.selectedNodeId) {
+    editor.select(toShapeId(snapshot.selectedNodeId));
+  }
+  editor.setCurrentTool("select");
+}
+
+function titleForNode(type: CanvasNodeKind): string {
+  switch (type) {
+    case "image":
+      return "图片节点";
+    case "prompt":
+      return "Prompt";
+    case "api_text2img":
+      return "文生图 API";
+    case "api_img2img":
+      return "图生图 API";
+    case "api_inpaint":
+      return "局部重绘 API";
+    case "video":
+      return "视频 API";
+    case "output":
+      return "Output";
+    default:
+      return type;
+  }
+}
+
+function toShapeId(id: string): TLShapeId {
+  return id.startsWith("shape:") ? (id as TLShapeId) : createShapeId(id);
+}
+
+function stripRecordPrefix(id: string): string {
+  return id.replace(/^[a-z]+:/, "");
 }
