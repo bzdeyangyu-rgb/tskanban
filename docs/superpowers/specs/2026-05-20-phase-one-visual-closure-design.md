@@ -1,44 +1,44 @@
-# Phase One Visual Closure Design
+# 第一阶段视觉闭环补齐设计
 
-## Goal
+## 目标
 
-Bring the completed phase-one implementation to an acceptance-ready state by filling the missing workflow loop while visually aligning the canvas experience with `references/Infinite-Canvas`.
+把已经完成的第一阶段推进到可验收状态：补齐缺失的工作流闭环，同时让画布视觉和交互对齐 `references/Infinite-Canvas` 案例项目。
 
-This is not phase two. The scope is limited to the first-stage MVP: import images, compose a small node flow, run image API nodes, see results in the canvas, preserve versions, and write RAG-ready trace data.
+这不是第二阶段。范围限定在第一阶段 MVP：导入图片、搭建小型节点流、运行图像 API 节点、在画布中看到结果、保留版本链，并写入可用于 RAG 的追踪数据。
 
-## Source Material
+## 依据材料
 
-- Root development plan (`开发计划.md`): prioritizes a stable local image workstation loop with durable logs and replayable outputs.
-- `SPEC.md`: defines the current MVP acceptance criteria for node canvas, image import, generation, inpaint, version retention, failure feedback, export, and RAG fields.
-- `references/Infinite-Canvas`: provides the mature visual and interaction reference. Its single-file implementation is a product reference, not code to copy directly.
-- `anli/PixPin_2026-05-18_19-03-36.png` and `anli/PixPin_2026-05-18_19-04-34.png`: confirm the desired dark dotted canvas, floating panels, node cards, curved links, and output-node behavior.
+- 根目录开发计划（`开发计划.md`）：强调先做稳定的本地图像工作台闭环，重点是可记录、可复盘、可继续开发。
+- `SPEC.md`：定义当前 MVP 的验收标准，包括节点画布、图片导入、生成、局部重绘、版本保留、失败反馈、导出和 RAG 字段。
+- `references/Infinite-Canvas`：提供成熟的视觉和交互参考。它的单文件实现只作为产品参考，不直接复制代码结构。
+- `anli/PixPin_2026-05-18_19-03-36.png` 和 `anli/PixPin_2026-05-18_19-04-34.png`：确认目标视觉，包括深色点阵画布、浮动面板、节点卡片、曲线连线和 Output 节点行为。
 
-## Design Decision
+## 设计决策
 
-Use a focused **A+ path**:
+采用聚焦的 **A+ 路径**：
 
-1. Preserve the current React, TypeScript, Vite, tldraw, Express, Zod, session, asset, and logger architecture.
-2. Fill only the phase-one acceptance gaps found in review.
-3. Adopt the reference project's visual language for the shell, nodes, inputs, output node, run states, and failure feedback.
-4. Do not implement full ComfyUI, LLM, loop, video, LoRA, or marketplace behavior in this pass.
+1. 保留当前 React、TypeScript、Vite、tldraw、Express、Zod、session、asset、logger 架构。
+2. 只补第一阶段审查发现的验收缺口。
+3. 直接采用案例项目的视觉语言：画布外壳、节点、输入区、Output 节点、运行状态和失败反馈。
+4. 本轮不实现完整 ComfyUI、LLM、Loop、Video、LoRA 或插件市场能力。
 
-## Visual Direction
+## 视觉方向
 
-The phase-one canvas should look and feel close to the reference project:
+第一阶段画布应接近案例项目的观感：
 
-- Full-screen dark canvas with subtle dotted grid.
-- Floating project/title pill near the top.
-- Left-side asset/import panel inspired by the reference local material panel.
-- Compact vertical tool rail for import, select/connect, history, save, and export actions.
-- Right/top compact controls for zoom, theme, API settings, save/load, and run status.
-- Floating bottom or side run/status bar only when it helps execution feedback.
-- Node cards use dark panels, soft borders, shadow, 16-22px radius, and compact typography.
+- 全屏深色画布，带低对比度点阵网格。
+- 顶部附近有浮动项目名/画布名胶囊。
+- 左侧素材/导入面板参考案例里的“本地资料查询/本地文件夹”区域。
+- 紧凑的垂直工具栏承载导入、选择/连接、历史、保存、导出等动作。
+- 右上角紧凑控制区承载缩放、主题、API 设置、保存/读取和运行状态。
+- 运行状态条可以浮在底部或侧边，但只在有助于反馈执行状态时出现。
+- 节点卡片使用深色面板、柔和边框、阴影、16-22px 圆角和紧凑字体。
 
-The implementation should not paste the reference CSS wholesale. Extract the useful tokens and patterns into our `web/styles.css` and React components.
+实现时不要整段粘贴案例项目 CSS。应该提取可复用的 token 和视觉模式，落到我们的 `web/styles.css` 与 React 组件中。
 
-## Node Model
+## 节点模型
 
-Phase one supports the existing node kinds:
+第一阶段支持当前已有节点类型：
 
 - `image`
 - `prompt`
@@ -46,73 +46,73 @@ Phase one supports the existing node kinds:
 - `api_img2img`
 - `api_inpaint`
 - `output`
-- `video` may remain visible only if already present, but it is not part of phase-one acceptance.
+- `video` 可以保留可见入口，但不作为第一阶段验收范围。
 
-Node cards should follow the reference structure:
+节点卡片采用案例结构：
 
-- Header: title, type, status badge.
-- Body: node-specific content.
-- Ports/connection affordance: clear input and output handles or tldraw arrow binding guidance.
-- Failure area: compact retry/error bar when a node fails.
+- 头部：标题、类型、状态徽章。
+- 主体：各节点自己的内容。
+- 连接提示：清晰的输入/输出端口，或明确的 tldraw 箭头绑定方式。
+- 失败区域：节点失败时显示紧凑的错误/重试栏。
 
-Minimum visual behavior:
+最低视觉行为：
 
-- `image` node shows image thumbnail, role tag, and missing-image drop zone.
-- `prompt` node shows editable prompt text.
-- API nodes show model/provider, upstream image thumbnails when present, prompt source summary, and run status.
-- `output` node shows generated outputs in a thumbnail grid.
+- `image` 节点显示图片缩略图、角色标签和缺图投放区。
+- `prompt` 节点显示可编辑提示词。
+- API 节点显示模型/供应商、上游图片缩略图、提示词来源摘要和运行状态。
+- `output` 节点用网格显示生成结果。
 
-## Import Flow
+## 导入流程
 
-The primary user path must not require manually typing asset IDs.
+主流程不能要求用户手动输入 Asset ID。
 
-Supported input methods:
+支持三种导入方式：
 
-- File picker from the asset/import panel.
-- Drag-and-drop image onto the canvas.
-- Ctrl+V paste from clipboard.
+- 从素材/导入面板选择文件。
+- 将图片拖拽到画布。
+- Ctrl+V 从剪贴板粘贴图片。
 
-Each successful import:
+每次成功导入后：
 
-1. Calls `POST /api/upload`.
-2. Creates or reuses the active session.
-3. Creates an `image` node at the canvas drop/paste location or selected insertion point.
-4. Stores `assetId`, `url`, `name`, `mime`, `roleTag`, and optional caption in node data.
-5. Shows the thumbnail immediately.
+1. 调用 `POST /api/upload`。
+2. 创建或复用当前 session。
+3. 在拖拽/粘贴位置或当前插入点创建 `image` 节点。
+4. 在节点数据中保存 `assetId`、`url`、`name`、`mime`、`roleTag` 和可选说明。
+5. 立即在节点内显示缩略图。
 
-Manual `Asset ID` editing may remain as an advanced fallback, but it is not the main workflow.
+手动编辑 `Asset ID` 可以保留为高级兜底能力，但不能作为主工作流。
 
-## Run And Output Flow
+## 运行与输出流程
 
-Running a flow should behave as a single coherent canvas operation:
+运行流程应表现为一次完整的画布操作：
 
-1. Compile the tldraw shapes into `CanvasSnapshot`.
-2. Save the canvas snapshot before execution.
-3. Execute through `POST /api/flows/execute`.
-4. Update node statuses from the execution result.
-5. Write generated assets into the connected `output` node's data.
-6. Render output thumbnails inside the `output` node.
-7. Preserve the option to add loose image shapes later, but the acceptance path is the output node grid.
+1. 将 tldraw shapes 编译为 `CanvasSnapshot`。
+2. 执行前自动保存画布快照。
+3. 通过 `POST /api/flows/execute` 执行。
+4. 根据执行结果更新节点状态。
+5. 将生成资产写入相连的 `output` 节点数据。
+6. 在 `output` 节点内渲染输出缩略图。
+7. 可以保留以后把结果图片散放到画布上的能力，但第一阶段验收路径以 Output 节点网格为准。
 
-If the flow has no output node, the UI should create one near the last executable node before or after execution, then connect or associate results with it.
+如果流程中没有 Output 节点，UI 应在最后一个可执行节点附近创建一个 Output 节点，并将本次结果关联进去。
 
-## Persistence
+## 持久化
 
-Canvas persistence is part of execution, not a separate optional user habit.
+画布持久化是运行的一部分，不应该依赖用户额外点击“保存”。
 
-On every flow run:
+每次运行流程时：
 
-- `logs/canvases/<canvasId>.json` is written with the latest nodes, edges, viewport, selection, title, and session id.
-- The session run record stores the same snapshot or a snapshot reference.
-- Version records include `sourceRunId`, `sourceNodeId`, and enough parent asset information to trace lineage.
+- 写入 `logs/canvases/<canvasId>.json`，包含最新节点、连线、视口、选中项、标题和 session id。
+- session run record 保存同一份快照，或保存可定位到快照的引用。
+- version record 包含 `sourceRunId`、`sourceNodeId` 和足够的父资产信息，用于追踪血缘。
 
-The manual save/load controls remain useful, but acceptance must not depend on pressing Save before Run.
+手动保存/读取按钮仍然保留，但验收不能依赖用户运行前先点保存。
 
-## RAG Trace Contract
+## RAG 追踪契约
 
-`rag_events.jsonl` must support reconstructing a real canvas run.
+`rag_events.jsonl` 必须能重建一次真实画布运行。
 
-Extend flow execution events with stable fields:
+扩展 flow 执行事件，稳定写入这些字段：
 
 - `canvas_id`
 - `canvas_snapshot_path`
@@ -130,65 +130,65 @@ Extend flow execution events with stable fields:
 - `selection_box`
 - `local_prompt`
 
-The route may write one aggregate `flow_execute` event plus node-level events, or node-level events only if they carry the full run linkage. The preferred design is:
+路由可以写一条聚合的 `flow_execute` 事件，再写节点级事件；也可以只写节点级事件，但必须带完整 run 关联。推荐设计是：
 
-- One aggregate event for the run summary.
-- One event per executable node attempt/result.
+- 一条聚合事件记录本次 run 摘要。
+- 每个可执行节点的每次尝试/结果写一条节点级事件。
 
-Field names should be stable because logs are long-term assets.
+字段命名要稳定，因为日志会成为长期资产。
 
-## Failure Feedback
+## 失败反馈
 
-Failure behavior should match the SPEC:
+失败行为必须符合 SPEC：
 
-- API node retries up to three times when the API call throws or returns an error.
-- The flow stops at the failed node.
-- The failed node receives `failed` status.
-- The node card displays a compact error summary.
-- The run panel or status pill displays the failed node id and message.
-- RAG logs include failed attempts.
+- API 节点在 API 调用抛错或返回错误时最多重试三次。
+- 流程停在失败节点。
+- 失败节点状态变为 `failed`。
+- 节点卡片显示紧凑错误摘要。
+- 运行面板或状态胶囊显示失败节点 id 和错误消息。
+- RAG 日志记录失败尝试。
 
-The UI should avoid modal interruptions for normal API failures.
+普通 API 失败不弹强打断模态框。
 
-## Export
+## 导出
 
-Phase-one export means exporting the currently selected output image.
+第一阶段导出指“导出当前选中的结果图”。
 
-Accepted behavior:
+可接受行为：
 
-- If an output thumbnail is selected, export/download that asset URL.
-- If an output node is selected and has outputs, export the latest or visibly selected output.
-- If no result is selected, show a concise status message instead of opening an empty download.
+- 如果选中了 Output 缩略图，导出该资产 URL。
+- 如果选中了 Output 节点且其中有结果，导出最新结果或当前可见选中结果。
+- 如果没有选中结果，显示简短状态提示，不触发空下载。
 
-## Out Of Scope
+## 不在本轮范围
 
-The following remain out of this supplement:
+以下内容不属于本次补齐：
 
-- Full reference-app feature parity.
-- ComfyUI workflow import/execution.
-- LLM image understanding node.
-- Loop/concurrent generation.
-- Video generation completion.
-- Multi-canvas library management beyond current save/load.
-- Full brush editing and mask authoring UI, except preserving existing `selection_box` and `maskAssetId` paths.
+- 完整复刻案例项目所有功能。
+- ComfyUI 工作流导入/执行。
+- LLM 识图节点。
+- Loop/并发生成。
+- Video 生成功能补全。
+- 超出现有保存/读取能力的多画布库管理。
+- 完整画笔编辑和 mask 绘制 UI，但保留既有 `selection_box` 与 `maskAssetId` 路径。
 
-## Acceptance Criteria
+## 验收标准
 
-The supplement is complete when:
+补齐完成后应满足：
 
-1. User can import a jpg/png by file picker, drag/drop, and paste, and each import creates a visible image node with an asset id.
-2. User can create a prompt, API node, and output node, connect them, and run the flow.
-3. Running the flow automatically saves the canvas snapshot.
-4. Generated assets appear inside the output node grid.
-5. Session versions and run records preserve source run, source node, parent assets, and output assets.
-6. `rag_events.jsonl` contains canvas id, run id, flow structure, node inputs, output assets, latency, and failure details.
-7. Failed API execution marks the node as failed, shows the error summary, and stops the flow after at most three attempts.
-8. The canvas shell and node cards visually align with the reference project's dark dotted canvas and floating-panel style.
-9. `npm test -- --run` and `npm run build` pass.
+1. 用户可以通过文件选择、拖拽和粘贴导入 jpg/png，每次导入都创建可见 image 节点并带 asset id。
+2. 用户可以创建 prompt、API 节点和 output 节点，连接后运行流程。
+3. 运行流程会自动保存画布快照。
+4. 生成资产显示在 Output 节点网格内。
+5. session version 和 run record 保留 source run、source node、parent assets 和 output assets。
+6. `rag_events.jsonl` 包含 canvas id、run id、流程结构、节点输入、输出资产、耗时和失败详情。
+7. API 执行失败时节点标记为 failed，显示错误摘要，并在最多三次尝试后停止流程。
+8. 画布外壳和节点卡片视觉对齐案例项目的深色点阵画布与浮动面板风格。
+9. `npm test -- --run` 和 `npm run build` 通过。
 
-## Design Self-Review
+## 设计自检
 
-- Placeholder scan: no TBD/TODO placeholders remain.
-- Scope check: this is a single phase-one supplement, not a phase-two feature set.
-- Consistency check: visual reference is reused as direction while implementation remains in the current React/tldraw architecture.
-- Ambiguity check: output acceptance is explicitly the output node grid, not loose canvas images.
+- 占位符检查：没有未定事项或空白 TODO。
+- 范围检查：这是单一第一阶段补齐，不是第二阶段功能集。
+- 一致性检查：视觉参考直接沿用案例方向，实现仍落在当前 React/tldraw 架构。
+- 歧义检查：输出验收明确为 Output 节点网格，不是散落画布图片。
