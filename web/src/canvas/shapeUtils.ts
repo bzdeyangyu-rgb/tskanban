@@ -1,16 +1,15 @@
 import {
   createBindingId,
   createShapeId,
-  toRichText,
   type Editor,
   type TLArrowBinding,
   type TLArrowShape,
   type TLBindingCreate,
-  type TLGeoShape,
   type TLImageShape,
   type TLShapeId,
   type TLShapePartial
 } from "tldraw";
+import type { TshuabuNodeShape } from "./TshuabuNodeShapeUtil";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./flowTypes";
 import type { CanvasSnapshot } from "./flowTypes";
 
@@ -28,19 +27,6 @@ export type NodeDefinition = {
   data?: Record<string, unknown>;
   width?: number;
   height?: number;
-};
-
-const NODE_COLORS: Record<CanvasNodeKind, TLGeoShape["props"]["color"]> = {
-  image: "blue",
-  prompt: "green",
-  api_text2img: "violet",
-  api_img2img: "orange",
-  api_inpaint: "red",
-  output: "black",
-  comfy: "light-violet",
-  llm: "light-blue",
-  loop: "yellow",
-  video: "light-red"
 };
 
 export function isTshuabuNodeMeta(meta: unknown): meta is TshuabuNodeMeta {
@@ -62,7 +48,7 @@ export function mergeNodeData(meta: TshuabuNodeMeta, patch: Record<string, unkno
   };
 }
 
-export function createNodeShape(definition: NodeDefinition, x: number, y: number, id?: TLShapeId): TLShapePartial<TLGeoShape> {
+export function createNodeShape(definition: NodeDefinition, x: number, y: number, id?: TLShapeId): TLShapePartial<TshuabuNodeShape> {
   const width = definition.width ?? 260;
   const height = definition.height ?? 140;
   const meta: TshuabuNodeMeta = {
@@ -75,26 +61,13 @@ export function createNodeShape(definition: NodeDefinition, x: number, y: number
 
   return {
     id: id ?? createShapeId(),
-    type: "geo",
+    type: "tshuabu-node",
     x,
     y,
     meta,
     props: {
-      geo: "rectangle",
       w: width,
-      h: height,
-      color: NODE_COLORS[definition.type],
-      fill: "semi",
-      dash: "solid",
-      size: "m",
-      font: "sans",
-      align: "middle",
-      verticalAlign: "middle",
-      labelColor: "black",
-      richText: toRichText(`${definition.title}\n${definition.type}`),
-      growY: 0,
-      scale: 1,
-      url: ""
+      h: height
     }
   };
 }
@@ -149,11 +122,92 @@ export function addOutputImagesToEditor(
   editor.setCurrentTool("select");
 }
 
+export function mergeOutputAssets(
+  data: Record<string, unknown>,
+  assets: Array<{ assetId: string; url: string }>
+): Record<string, unknown> {
+  const existing = Array.isArray(data.outputs) ? data.outputs : [];
+  const seen = new Set(existing.map((item) => (isOutputAsset(item) ? item.assetId : "")));
+  const outputs = [...existing];
+
+  for (const asset of assets) {
+    if (seen.has(asset.assetId)) {
+      continue;
+    }
+    outputs.push(asset);
+    seen.add(asset.assetId);
+  }
+
+  return { ...data, outputs };
+}
+
+export function updateNodeStatuses(
+  editor: Editor,
+  nodes: Array<{ nodeId: string; status: CanvasNodeStatus; errorMessage?: string }>
+): void {
+  for (const node of nodes) {
+    const shape = editor.getShape(node.nodeId as TLShapeId);
+    if (!shape || !isTshuabuNodeMeta(shape.meta)) {
+      continue;
+    }
+
+    editor.updateShape({
+      id: shape.id,
+      type: shape.type,
+      meta: {
+        ...shape.meta,
+        status: node.status,
+        data: node.errorMessage ? { ...shape.meta.data, errorMessage: node.errorMessage } : shape.meta.data
+      }
+    });
+  }
+}
+
+export function addOutputsToOutputNode(editor: Editor, assets: Array<{ assetId: string; url: string }>): boolean {
+  if (assets.length === 0) {
+    return false;
+  }
+
+  const outputShape = editor
+    .getCurrentPageShapes()
+    .find((shape) => isTshuabuNodeMeta(shape.meta) && shape.meta.nodeType === "output");
+  if (!outputShape || !isTshuabuNodeMeta(outputShape.meta)) {
+    return false;
+  }
+
+  editor.updateShape({
+    id: outputShape.id,
+    type: outputShape.type,
+    meta: {
+      ...outputShape.meta,
+      status: "success",
+      data: mergeOutputAssets(outputShape.meta.data, assets)
+    }
+  });
+  editor.select(outputShape.id);
+  return true;
+}
+
+export function selectedOutputAsset(editor: Editor): { assetId: string; url: string } | undefined {
+  const selected = editor
+    .getSelectedShapeIds()
+    .map((id) => editor.getShape(id))
+    .find((shape) => isTshuabuNodeMeta(shape?.meta) && shape.meta.nodeType === "output");
+
+  if (!selected || !isTshuabuNodeMeta(selected.meta)) {
+    return undefined;
+  }
+
+  const outputs = Array.isArray(selected.meta.data.outputs) ? selected.meta.data.outputs : [];
+  const last = outputs[outputs.length - 1];
+  return isOutputAsset(last) ? last : undefined;
+}
+
 export function canvasSnapshotToEditorContent(snapshot: CanvasSnapshot): {
-  shapes: Array<TLShapePartial<TLGeoShape> | TLShapePartial<TLArrowShape>>;
+  shapes: Array<TLShapePartial<TshuabuNodeShape> | TLShapePartial<TLArrowShape>>;
   bindings: TLBindingCreate<TLArrowBinding>[];
 } {
-  const shapes: Array<TLShapePartial<TLGeoShape> | TLShapePartial<TLArrowShape>> = snapshot.nodes.map((node) => {
+  const shapes: Array<TLShapePartial<TshuabuNodeShape> | TLShapePartial<TLArrowShape>> = snapshot.nodes.map((node) => {
     const shape = createNodeShape(
       {
         type: node.type,
@@ -288,4 +342,13 @@ function toShapeId(id: string): TLShapeId {
 
 function stripRecordPrefix(id: string): string {
   return id.replace(/^[a-z]+:/, "");
+}
+
+function isOutputAsset(value: unknown): value is { assetId: string; url: string } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as { assetId?: unknown }).assetId === "string" &&
+      typeof (value as { url?: unknown }).url === "string"
+  );
 }

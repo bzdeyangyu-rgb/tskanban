@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
 import {
   executeCanvasFlow,
@@ -6,22 +6,27 @@ import {
   fetchSession,
   loadCanvasSnapshot,
   saveCanvasSnapshot,
+  uploadImage,
   type ApiProvider,
   type CanvasSession,
   type FlowExecutionNode
 } from "./api/client";
 import { CanvasApp } from "./canvas/CanvasApp";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
-import type { CanvasNodeKind } from "./canvas/flowTypes";
+import { imageFilesFromList } from "./canvas/importImages";
+import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
 import {
   addNodeToEditor,
-  addOutputImagesToEditor,
+  addOutputsToOutputNode,
   isTshuabuNodeMeta,
   mergeNodeData,
   restoreCanvasSnapshot,
+  selectedOutputAsset,
+  updateNodeStatuses,
   type TshuabuNodeMeta
 } from "./canvas/shapeUtils";
 import { ApiSettings } from "./panels/ApiSettings";
+import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
@@ -135,6 +140,56 @@ export function App() {
     [editor, selectedNode]
   );
 
+  const handleImportFiles = useCallback(
+    async (files: File[]) => {
+      if (!editor) {
+        setStatus("画布还在加载");
+        return;
+      }
+
+      const imageFiles = imageFilesFromList(files);
+      if (imageFiles.length === 0) {
+        setStatus("没有可导入的 jpg/png 图片");
+        return;
+      }
+
+      try {
+        setStatus(`正在导入 ${imageFiles.length} 张图片`);
+        let currentSessionId = session?.sessionId;
+        for (const file of imageFiles) {
+          const uploaded = await uploadImage(file, currentSessionId);
+          currentSessionId = uploaded.sessionId;
+          addNodeToEditor(
+            editor,
+            {
+              type: "image",
+              title: "图片节点",
+              data: {
+                assetId: uploaded.asset.assetId,
+                url: uploaded.asset.publicUrl,
+                name: file.name,
+                mime: uploaded.asset.mime,
+                roleTag: "素材"
+              },
+              width: 280,
+              height: 260
+            },
+            placementIndexRef.current
+          );
+          placementIndexRef.current += 1;
+        }
+
+        if (currentSessionId) {
+          setSession(await fetchSession(currentSessionId));
+        }
+        setStatus(`已导入 ${imageFiles.length} 张图片`);
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [editor, session?.sessionId]
+  );
+
   const handleRun = useCallback(async () => {
     if (!editor) {
       setStatus("画布还在加载");
@@ -142,19 +197,36 @@ export function App() {
     }
 
     try {
+      ensureOutputNode(editor, placementIndexRef);
       const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
       if (snapshot.nodes.length === 0) {
         setStatus("请先添加节点");
         return;
       }
 
+      updateNodeStatuses(
+        editor,
+        snapshot.nodes.map((node) => ({ nodeId: node.id, status: "running" as CanvasNodeStatus }))
+      );
       setStatus(`提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`);
       const result = await executeCanvasFlow(snapshot);
       setLastRunNodes(result.nodes);
       const nextSession = await fetchSession(result.sessionId);
       setSession(nextSession);
-      addOutputImagesToEditor(editor, result.outputAssets);
-      setStatus(`执行完成：${result.nodes.length} 个节点有状态`);
+      updateNodeStatuses(
+        editor,
+        result.nodes.map((node) => ({
+          nodeId: node.nodeId,
+          status: node.status as CanvasNodeStatus,
+          errorMessage: node.errorMessage
+        }))
+      );
+      addOutputsToOutputNode(editor, result.outputAssets);
+      setStatus(
+        result.run.status === "failed"
+          ? `执行失败：${result.run.errorMessage ?? "请检查失败节点"}`
+          : `执行完成：${result.nodes.length} 个节点有状态`
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -195,17 +267,38 @@ export function App() {
     }
   }, [canvasId, editor]);
 
+  const handleExportSelected = useCallback(() => {
+    if (!editor) {
+      setStatus("画布还在加载");
+      return;
+    }
+
+    const asset = selectedOutputAsset(editor);
+    if (!asset) {
+      setStatus("请先选择带结果的 Output 节点");
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = asset.url;
+    link.download = `${asset.assetId}.png`;
+    link.click();
+    setStatus(`已导出 ${asset.assetId}`);
+  }, [editor]);
+
   return (
-    <main className="app-shell">
-      <aside className="side-panel" aria-label="节点栏">
+    <main className="app-shell visual-shell">
+      <aside className="floating-panel left-material-panel" aria-label="素材面板">
+        <AssetImportPanel disabled={!editor} onFiles={handleImportFiles} />
         <NodePalette disabled={!editor} onAddNode={handleAddNode} onConnectMode={handleConnectMode} />
-        <ApiSettings providers={providers} onProvidersChange={setProviders} />
       </aside>
       <section className="workspace" aria-label="画布">
-        <CanvasApp onMount={setEditor} />
+        <div className="project-pill">Tshuabu 画布</div>
+        <CanvasApp onFiles={handleImportFiles} onMount={setEditor} />
         <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
       </section>
-      <aside className="side-panel" aria-label="属性栏">
+      <aside className="floating-panel right-control-panel" aria-label="控制面板">
+        <ApiSettings providers={providers} onProvidersChange={setProviders} />
         <Inspector
           providers={providers}
           runNodes={lastRunNodes}
@@ -217,11 +310,24 @@ export function App() {
           savedAt={savedAt}
           onLoad={handleLoadCanvas}
           onSave={handleSaveCanvas}
+          onExport={handleExportSelected}
         />
         <RunHistory session={session} />
       </aside>
     </main>
   );
+}
+
+function ensureOutputNode(editor: Editor, placementIndexRef: MutableRefObject<number>): void {
+  const hasOutputNode = editor
+    .getCurrentPageShapes()
+    .some((shape) => isTshuabuNodeMeta(shape.meta) && shape.meta.nodeType === "output");
+  if (hasOutputNode) {
+    return;
+  }
+
+  addNodeToEditor(editor, { type: "output", title: "Output", data: {}, width: 460, height: 260 }, placementIndexRef.current);
+  placementIndexRef.current += 1;
 }
 
 function nodeDefinition(type: CanvasNodeKind, providerId?: string) {

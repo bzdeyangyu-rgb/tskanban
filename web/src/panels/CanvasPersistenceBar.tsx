@@ -2,11 +2,13 @@ export function CanvasPersistenceBar({
   canvasId,
   savedAt,
   onLoad,
+  onExport,
   onSave
 }: {
   canvasId: string;
   savedAt: string;
   onLoad: () => void;
+  onExport: () => void;
   onSave: () => void;
 }) {
   return (
@@ -22,6 +24,9 @@ export function CanvasPersistenceBar({
         </button>
         <button className="mini-button" onClick={onLoad} type="button">
           读取画布
+        </button>
+        <button className="mini-button" onClick={onExport} type="button">
+          导出选中结果
         </button>
       </div>
       {savedAt ? <p className="muted compact">最近保存：{savedAt}</p> : <p className="muted compact">尚未保存</p>}

@@ -55,6 +55,7 @@ export type CanvasRunRecord = {
   startedAt: string;
   completedAt: string;
   latencyMs: number;
+  snapshot: CanvasSnapshot;
   nodes: CanvasRunNode[];
   outputAssetIds: string[];
   errorMessage?: string;
@@ -112,12 +113,27 @@ export type RagEvent = {
   latency_ms: number;
   error_message?: string;
   flow_id?: string;
+  canvas_id?: string;
+  canvas_snapshot_path?: string;
+  target_node_id?: string;
+  run_id?: string;
+  node_id?: string;
+  node_type?: string;
+  node_status?: string;
+  retry_attempt?: number;
+  max_retries?: number;
+  node_latency_ms?: number;
+  node_inputs?: Record<string, unknown>;
 };
 
 export type FlowExecutionResponse = {
   sessionId: string;
   flowId: string;
   runId: string;
+  canvas: {
+    canvasId: string;
+    updatedAt: string;
+  };
   nodes: FlowExecutionNode[];
   outputAssets: Array<{ assetId: string; url: string }>;
   run: CanvasRunRecord;
@@ -127,6 +143,16 @@ export type StoredCanvas = CanvasSnapshot & {
   title: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type UploadedAsset = {
+  assetId: string;
+  kind: string;
+  path: string;
+  publicUrl: string;
+  mime: string;
+  size: number;
+  createdAt: string;
 };
 
 export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecutionResponse> {
@@ -140,11 +166,35 @@ export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecu
   });
   const json = await response.json();
 
-  if (!json.ok) {
+  if (!json.ok && !json.data) {
     throw new Error(json.error || "流程执行失败");
   }
 
   return json.data as FlowExecutionResponse;
+}
+
+export async function uploadImage(
+  file: File,
+  sessionId?: string,
+  roleTag = "素材"
+): Promise<{ sessionId: string; asset: UploadedAsset }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("kind", "base");
+  form.append("roleTag", roleTag);
+  if (sessionId) {
+    form.append("sessionId", sessionId);
+  }
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: form
+  });
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "图片上传失败");
+  }
+  return json.data as { sessionId: string; asset: UploadedAsset };
 }
 
 export async function saveCanvasSnapshot(flow: CanvasSnapshot, title = "画布"): Promise<StoredCanvas> {

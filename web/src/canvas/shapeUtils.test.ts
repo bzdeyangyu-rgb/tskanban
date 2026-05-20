@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canvasSnapshotToEditorContent, mergeNodeData, type TshuabuNodeMeta } from "./shapeUtils";
+import {
+  canvasSnapshotToEditorContent,
+  createNodeShape,
+  mergeNodeData,
+  mergeOutputAssets,
+  type TshuabuNodeMeta
+} from "./shapeUtils";
 
 describe("shape node metadata", () => {
   it("merges edited node data without changing node identity", () => {
@@ -20,6 +26,42 @@ describe("shape node metadata", () => {
     });
   });
 
+  it("creates custom Tshuabu node shapes", () => {
+    const shape = createNodeShape({ type: "prompt", title: "Prompt", data: { text: "hello" } }, 10, 20);
+
+    expect(shape.type).toBe("tshuabu-node");
+    expect(shape.meta).toMatchObject({
+      kind: "tshuabu-node",
+      nodeType: "prompt",
+      title: "Prompt"
+    });
+  });
+
+  it("appends generated assets into output node data", () => {
+    expect(
+      mergeOutputAssets(
+        { outputs: [{ assetId: "old", url: "/outputs/old.png" }] },
+        [{ assetId: "new", url: "/outputs/new.png" }]
+      )
+    ).toEqual({
+      outputs: [
+        { assetId: "old", url: "/outputs/old.png" },
+        { assetId: "new", url: "/outputs/new.png" }
+      ]
+    });
+  });
+
+  it("deduplicates output assets by asset id", () => {
+    expect(
+      mergeOutputAssets(
+        { outputs: [{ assetId: "old", url: "/outputs/old.png" }] },
+        [{ assetId: "old", url: "/outputs/old-again.png" }]
+      )
+    ).toEqual({
+      outputs: [{ assetId: "old", url: "/outputs/old.png" }]
+    });
+  });
+
   it("converts a saved canvas snapshot back to node shapes and arrow bindings", () => {
     const content = canvasSnapshotToEditorContent({
       canvasId: "c1",
@@ -32,6 +74,7 @@ describe("shape node metadata", () => {
     });
 
     expect(content.shapes.map((shape) => shape.id)).toEqual(["shape:p1", "shape:g1", "shape:e1"]);
+    expect(content.shapes.slice(0, 2).map((shape) => shape.type)).toEqual(["tshuabu-node", "tshuabu-node"]);
     expect(content.bindings.map((binding) => [binding.fromId, binding.toId, binding.props.terminal])).toEqual([
       ["shape:e1", "shape:p1", "start"],
       ["shape:e1", "shape:g1", "end"]

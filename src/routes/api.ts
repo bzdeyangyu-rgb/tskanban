@@ -32,6 +32,7 @@ import { listTemplates, saveTemplate, findTemplate } from "../templates";
 import { validateFlowSnapshot } from "../flows/validate";
 import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
 import { executeFlowSnapshot } from "../flows/execute";
+import type { FlowSnapshot } from "../flows/types";
 import { createApiFlowRunners } from "../flows/runners/api";
 import {
   fetchProviderModels,
@@ -585,8 +586,13 @@ apiRouter.post("/flows/execute", async (req, res) => {
   try {
     const input = canvasExecuteSchema.parse(req.body ?? {});
     const session = await getOrCreateSession(input.sessionId ?? input.flow.sessionId);
+    const savedCanvas = await saveCanvas({
+      ...input.flow,
+      sessionId: session.sessionId,
+      title: canvasTitleFromBody(req.body)
+    });
     const runners = createApiFlowRunners({ session, flowId: runId, getProvider: providerStore.getProvider });
-    const result = await executeFlowSnapshot(input.flow, {
+    const result = await executeFlowSnapshot(savedCanvas, {
       sessionId: session.sessionId,
       targetNodeId: input.targetNodeId,
       runners
@@ -596,26 +602,28 @@ apiRouter.post("/flows/execute", async (req, res) => {
     const runRecord = appendRunRecord(session, {
       runId,
       flowId,
-      canvasId: input.flow.canvasId,
+      canvasId: savedCanvas.canvasId,
       targetNodeId: input.targetNodeId,
       status: result.ok ? "success" : "failed",
       startedAt,
       completedAt,
       latencyMs,
-      snapshot: input.flow,
+      snapshot: savedCanvas,
       nodes: result.nodes,
       errorMessage: result.error
     });
     await saveSession(session);
 
+    const savedCanvasPath = canvasSnapshotLogPath(savedCanvas.canvasId);
+    const resultsByNodeId = new Map(result.nodes.map((node) => [node.nodeId, node]));
     await logEvent({
       ...createBaseEvent({
         sessionId: session.sessionId,
         action: "flow_execute",
-        model: "fake",
+        model: "local",
         prompt: "execute_canvas_flow",
         params: {
-          canvasId: input.flow.canvasId,
+          canvasId: savedCanvas.canvasId,
           targetNodeId: input.targetNodeId,
           ok: result.ok,
           runId: runRecord.runId,
@@ -624,15 +632,57 @@ apiRouter.post("/flows/execute", async (req, res) => {
         inputAssets: []
       }),
       flow_id: flowId,
+      canvas_id: savedCanvas.canvasId,
+      canvas_snapshot_path: savedCanvasPath,
+      target_node_id: input.targetNodeId,
+      run_id: runRecord.runId,
       flow_structure: {
-        nodes: input.flow.nodes.map((node) => `${node.id}:${node.type}`),
-        edges: input.flow.edges.map((edge) => ({ from: edge.from, to: edge.to }))
+        nodes: savedCanvas.nodes.map((node) => `${node.id}:${node.type}`),
+        edges: savedCanvas.edges.map((edge) => ({ from: edge.from, to: edge.to }))
       },
       output_assets: result.nodes.flatMap((node) => (node.outputAssets ?? []).map((asset) => asset.url)),
       status: result.ok ? "success" : "failed",
       latency_ms: latencyMs,
       error_message: result.error
     });
+
+    for (const node of result.nodes) {
+      await logEvent({
+        ...createBaseEvent({
+          sessionId: session.sessionId,
+          action: "flow_execute",
+          model: typeof node.data?.model === "string" ? node.data.model : "local",
+          prompt: typeof node.data?.prompt === "string" ? node.data.prompt : "execute_node",
+          params: {
+            canvasId: savedCanvas.canvasId,
+            runId: runRecord.runId,
+            nodeId: node.nodeId,
+            attempts: node.attempts
+          },
+          inputAssets: node.inputAssetIds ?? []
+        }),
+        flow_id: flowId,
+        canvas_id: savedCanvas.canvasId,
+        canvas_snapshot_path: savedCanvasPath,
+        target_node_id: input.targetNodeId,
+        run_id: runRecord.runId,
+        flow_structure: {
+          nodes: savedCanvas.nodes.map((item) => `${item.id}:${item.type}`),
+          edges: savedCanvas.edges.map((edge) => ({ from: edge.from, to: edge.to }))
+        },
+        node_id: node.nodeId,
+        node_type: node.nodeType,
+        node_status: node.status,
+        retry_attempt: node.attempts,
+        max_retries: 3,
+        node_latency_ms: node.latencyMs,
+        node_inputs: nodeInputsForLog(savedCanvas, node.nodeId, resultsByNodeId),
+        output_assets: (node.outputAssets ?? []).map((asset) => asset.url),
+        status: node.status === "failed" ? "failed" : "success",
+        latency_ms: node.latencyMs,
+        error_message: node.errorMessage
+      });
+    }
 
     res.status(result.ok ? 200 : 500).json({
       ok: result.ok,
@@ -641,6 +691,10 @@ apiRouter.post("/flows/execute", async (req, res) => {
         sessionId: session.sessionId,
         flowId,
         runId,
+        canvas: {
+          canvasId: savedCanvas.canvasId,
+          updatedAt: savedCanvas.updatedAt
+        },
         nodes: result.nodes,
         outputAssets: result.nodes.flatMap((node) => node.outputAssets ?? []),
         run: runRecord
@@ -651,6 +705,77 @@ apiRouter.post("/flows/execute", async (req, res) => {
     res.status(400).json({ ok: false, error: message });
   }
 });
+
+function canvasTitleFromBody(body: unknown): string {
+  if (!body || typeof body !== "object" || !("title" in body)) {
+    return "当前画布";
+  }
+  const title = (body as { title?: unknown }).title;
+  return typeof title === "string" && title.trim() ? title.trim() : "当前画布";
+}
+
+function canvasSnapshotLogPath(canvasId: string): string {
+  const safe = canvasId.replace(/[^a-zA-Z0-9_-]/g, "");
+  return `logs/canvases/${safe}.json`;
+}
+
+function nodeInputsForLog(
+  flow: FlowSnapshot,
+  nodeId: string,
+  resultsByNodeId: Map<string, { outputAssetIds: string[] }>
+): Record<string, unknown> {
+  const node = flow.nodes.find((item) => item.id === nodeId);
+  const upstreamIds = flow.edges.filter((edge) => edge.to === nodeId).map((edge) => edge.from);
+  const upstreamNodes = upstreamIds
+    .map((id) => flow.nodes.find((node) => node.id === id))
+    .filter((node): node is FlowSnapshot["nodes"][number] => Boolean(node));
+  return {
+    ...curatedNodePayload(node),
+    upstreamNodes: upstreamNodes.map((upstream) => ({
+      ...curatedNodePayload(upstream),
+      resultAssetIds: resultsByNodeId.get(upstream.id)?.outputAssetIds ?? []
+    }))
+  };
+}
+
+function curatedNodePayload(node: FlowSnapshot["nodes"][number] | undefined): Record<string, unknown> {
+  if (!node) {
+    return {};
+  }
+
+  const payload: Record<string, unknown> = {
+    nodeId: node.id,
+    nodeType: node.type
+  };
+  addStringField(payload, "prompt", node.data.prompt);
+  addStringField(payload, "negativePrompt", node.data.negativePrompt);
+  addStringField(payload, "model", node.data.model);
+  addStringField(payload, "providerId", node.data.providerId);
+  addStringField(payload, "baseAssetId", node.data.baseAssetId);
+  addStringField(payload, "maskAssetId", node.data.maskAssetId);
+
+  if (node.type === "prompt") {
+    addStringField(payload, "prompt", node.data.text);
+  }
+  if (node.type === "image") {
+    addStringField(payload, "imageAssetId", node.data.assetId);
+  }
+  if (isRecord(node.data.params)) {
+    payload.params = node.data.params;
+  }
+
+  return payload;
+}
+
+function addStringField(payload: Record<string, unknown>, key: string, value: unknown): void {
+  if (typeof value === "string" && value.trim()) {
+    payload[key] = value;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
 
 apiRouter.post("/flows/execute-legacy", async (req, res) => {
   let sessionId = "";

@@ -28,13 +28,18 @@ export type RagEvent = {
   latency_ms: number;
   error_message?: string | undefined;
   flow_id?: string | undefined;
+  canvas_id?: string | undefined;
+  canvas_snapshot_path?: string | undefined;
+  target_node_id?: string | undefined;
+  run_id?: string | undefined;
   flow_structure?: { nodes: string[]; edges: { from: string; to: string }[] } | undefined;
   node_id?: string | undefined;
   node_type?: string | undefined;
-  node_status?: "idle" | "running" | "success" | "failed" | "retrying" | undefined;
+  node_status?: "idle" | "queued" | "running" | "success" | "failed" | "retrying" | undefined;
   retry_attempt?: number | undefined;
   max_retries?: number | undefined;
   node_latency_ms?: number | undefined;
+  node_inputs?: Record<string, unknown> | undefined;
   selection_box?: {
     x: number;
     y: number;
@@ -108,16 +113,21 @@ export async function logEvent(event: RagEvent): Promise<void> {
   await appendFile(MARKDOWN_PATH, mdBlock, "utf8");
 }
 
-function toMarkdownBlock(event: RagEvent): string {
+export function toMarkdownBlock(event: RagEvent): string {
   const date = event.timestamp.replace("T", " ").replace(".000Z", "Z");
   const params = Object.keys(event.params).length > 0 ? JSON.stringify(event.params) : "{}";
   const input = event.input_assets.length > 0 ? event.input_assets.join(" + ") : "-";
   const output = event.output_assets.length > 0 ? event.output_assets.join(", ") : "-";
   const error = event.error_message ? `\n- error: ${event.error_message}` : "";
   const flowInfo = event.flow_id ? `\n- flow: ${event.flow_id}` : "";
+  const canvasInfo = event.canvas_id ? `\n- canvas: ${event.canvas_id}` : "";
+  const canvasSnapshotInfo = event.canvas_snapshot_path ? `\n- canvas_snapshot: ${event.canvas_snapshot_path}` : "";
+  const runInfo = event.run_id ? `\n- run: ${event.run_id}` : "";
+  const targetNodeInfo = event.target_node_id ? `\n- target_node: ${event.target_node_id}` : "";
   const nodeInfo = event.node_id
     ? `\n- node: ${event.node_id} (${event.node_type ?? "unknown"}) ${event.node_status ?? ""}`
     : "";
+  const nodeInputsInfo = event.node_inputs ? `\n- node_inputs: ${JSON.stringify(event.node_inputs)}` : "";
   const retryInfo =
     typeof event.retry_attempt === "number"
       ? `\n- retry: ${event.retry_attempt}/${event.max_retries ?? 3}`
@@ -126,7 +136,7 @@ function toMarkdownBlock(event: RagEvent): string {
     ? `\n- selection: ${JSON.stringify(event.selection_box)}\n- local_prompt: "${event.local_prompt ?? ""}"`
     : "";
 
-  return `\n## ${date} ${event.action} ${event.status}\n- session: ${event.session_id}\n- model: ${event.model}\n- prompt: "${event.prompt}"\n- negative_prompt: "${event.negative_prompt ?? ""}"\n- params: ${params}\n- input: ${input}\n- output: ${output}\n- latency: ${event.latency_ms}ms${flowInfo}${nodeInfo}${retryInfo}${selectionInfo}${error}\n`;
+  return `\n## ${date} ${event.action} ${event.status}\n- session: ${event.session_id}\n- model: ${event.model}\n- prompt: "${event.prompt}"\n- negative_prompt: "${event.negative_prompt ?? ""}"\n- params: ${params}\n- input: ${input}\n- output: ${output}\n- latency: ${event.latency_ms}ms${flowInfo}${canvasInfo}${canvasSnapshotInfo}${runInfo}${targetNodeInfo}${nodeInfo}${retryInfo}${nodeInputsInfo}${selectionInfo}${error}\n`;
 }
 
 export async function readLatestEvents(limit: number): Promise<RagEvent[]> {
@@ -210,7 +220,7 @@ export function filterEvents(events: RagEvent[], query: EventQuery): RagEvent[] 
     }
 
     if (keyword) {
-      const text = `${event.prompt} ${event.negative_prompt ?? ""} ${JSON.stringify(event.params)} ${event.error_message ?? ""}`.toLowerCase();
+      const text = eventSearchText(event).toLowerCase();
       if (!text.includes(keyword)) {
         return false;
       }
@@ -220,8 +230,27 @@ export function filterEvents(events: RagEvent[], query: EventQuery): RagEvent[] 
   });
 }
 
+function eventSearchText(event: RagEvent): string {
+  return [
+    event.prompt,
+    event.negative_prompt,
+    JSON.stringify(event.params),
+    event.error_message,
+    event.canvas_id,
+    event.canvas_snapshot_path,
+    event.target_node_id,
+    event.run_id,
+    event.node_id,
+    event.node_type,
+    event.node_status,
+    event.node_inputs ? JSON.stringify(event.node_inputs) : undefined
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+}
+
 function eventMatchesRun(event: RagEvent, runId: string): boolean {
-  return event.flow_id === runId || event.params.runId === runId || event.params.sourceRunId === runId;
+  return event.run_id === runId || event.flow_id === runId || event.params.runId === runId || event.params.sourceRunId === runId;
 }
 
 function eventMatchesAsset(event: RagEvent, assetId: string): boolean {
