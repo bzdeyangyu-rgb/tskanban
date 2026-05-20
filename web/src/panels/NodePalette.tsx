@@ -1,4 +1,4 @@
-import { ArrowRight, Braces, Image, MessageSquareText, Paintbrush, ScanLine, WandSparkles } from "lucide-react";
+import { ArrowRight, Braces, Clapperboard, Image, MessageSquareText, Paintbrush, ScanLine, WandSparkles } from "lucide-react";
 import type { CanvasNodeKind } from "../canvas/flowTypes";
 
 const nodeButtons = [
@@ -7,6 +7,7 @@ const nodeButtons = [
   { label: "文生图 API", type: "api_text2img", icon: WandSparkles },
   { label: "图生图 API", type: "api_img2img", icon: Paintbrush },
   { label: "局部重绘 API", type: "api_inpaint", icon: ScanLine },
+  { label: "视频 API", type: "video", icon: Clapperboard },
   { label: "Output 节点", type: "output", icon: Braces }
 ] satisfies Array<{ label: string; type: CanvasNodeKind; icon: typeof Image }>;
 

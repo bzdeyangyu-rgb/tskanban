@@ -50,6 +50,31 @@ export const img2imgSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional()
 });
 
+export const providerProtocolSchema = z.enum(["openai", "apimart"]);
+
+export const apiProviderSchema = z.object({
+  id: z.string().min(1).max(60),
+  name: z.string().min(1).max(80),
+  baseUrl: z.string().url(),
+  protocol: providerProtocolSchema.default("openai"),
+  enabled: z.boolean().default(true),
+  primary: z.boolean().default(false),
+  apiKey: z.string().optional(),
+  imageModels: z.array(z.string()).default([]),
+  chatModels: z.array(z.string()).default([]),
+  videoModels: z.array(z.string()).default([])
+});
+
+export const saveProvidersSchema = z.object({
+  providers: z.array(apiProviderSchema).min(1)
+});
+
+export const providerConnectionSchema = z.object({
+  providerId: z.string().optional(),
+  baseUrl: z.string().url(),
+  apiKey: z.string().optional()
+});
+
 export const canvasNodeTypeSchema = z.enum([
   "image",
   "prompt",

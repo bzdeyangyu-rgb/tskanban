@@ -6,6 +6,7 @@ export type EventAction =
   | "text2img"
   | "img2img"
   | "inpaint"
+  | "video"
   | "prompt_template_use"
   | "prompt_template_create"
   | "asset_upload"

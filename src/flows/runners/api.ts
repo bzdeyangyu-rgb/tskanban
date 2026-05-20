@@ -1,5 +1,6 @@
 import { saveOutputAsAsset } from "../../services/assets";
 import { appendVersion, attachAsset, type CanvasSession } from "../../services/sessions";
+import { providerStore, type ApiProvider } from "../../services/providers";
 import { generateImage as defaultGenerateImage, type ImageRequest, type ImageResult } from "../../imageApi";
 import type { FlowRunner, RunnerOutput } from "../execute";
 import type { ExecutableNodeType, FlowNode, NodeExecutionResult } from "../types";
@@ -7,6 +8,7 @@ import type { ExecutableNodeType, FlowNode, NodeExecutionResult } from "../types
 export type ApiFlowRunnerOptions = {
   session: CanvasSession;
   generateImage?: (request: ImageRequest) => Promise<ImageResult>;
+  getProvider?: (providerId?: string | undefined) => Promise<ApiProvider>;
 };
 
 export function createApiFlowRunners(
@@ -15,7 +17,8 @@ export function createApiFlowRunners(
   return {
     api_text2img: (input) => runApiText2Img(input, options),
     api_img2img: (input) => runApiImg2Img(input, options),
-    api_inpaint: (input) => runApiInpaint(input, options)
+    api_inpaint: (input) => runApiInpaint(input, options),
+    video: (input) => runApiVideo(input, options)
   };
 }
 
@@ -25,12 +28,14 @@ async function runApiText2Img(input: Parameters<FlowRunner>[0], options: ApiFlow
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
   const params = recordData(input.node, "params");
+  const provider = await providerFrom(input.node, options);
   const result = await generate(options, {
     action: "text2img",
     model,
     prompt,
     negativePrompt,
-    params
+    params,
+    provider
   });
 
   return persistGeneratedOutputs(options.session, {
@@ -50,6 +55,7 @@ async function runApiImg2Img(input: Parameters<FlowRunner>[0], options: ApiFlowR
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
   const params = recordData(input.node, "params");
+  const provider = await providerFrom(input.node, options);
   const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
 
   const result = await generate(options, {
@@ -58,7 +64,8 @@ async function runApiImg2Img(input: Parameters<FlowRunner>[0], options: ApiFlowR
     prompt,
     negativePrompt,
     params,
-    inputImage: base.path
+    inputImage: base.path,
+    provider
   });
 
   return persistGeneratedOutputs(options.session, {
@@ -79,6 +86,7 @@ async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowR
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
   const params = recordData(input.node, "params");
+  const provider = await providerFrom(input.node, options);
   const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
   const mask = findAssetById(options.session, stringData(input.node, "maskAssetId"));
 
@@ -89,7 +97,8 @@ async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowR
     negativePrompt,
     params,
     inputImage: base.path,
-    maskImage: mask.path
+    maskImage: mask.path,
+    provider
   });
 
   return persistGeneratedOutputs(options.session, {
@@ -105,6 +114,37 @@ async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowR
   });
 }
 
+async function runApiVideo(input: Parameters<FlowRunner>[0], options: ApiFlowRunnerOptions): Promise<RunnerOutput> {
+  const started = Date.now();
+  const model = stringData(input.node, "model");
+  const prompt = promptFrom(input.upstreamNodes, input.node);
+  const negativePrompt = optionalStringData(input.node, "negativePrompt");
+  const params = recordData(input.node, "params");
+  const provider = await providerFrom(input.node, options);
+  const base = findOptionalInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
+
+  const result = await generate(options, {
+    action: "video",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    inputImage: base?.path,
+    provider
+  });
+
+  return persistGeneratedOutputs(options.session, {
+    action: "video",
+    model,
+    prompt,
+    negativePrompt,
+    params,
+    result,
+    latencyMs: Date.now() - started,
+    baseAssetId: base?.assetId
+  });
+}
+
 async function generate(options: ApiFlowRunnerOptions, request: ImageRequest): Promise<ImageResult> {
   const generateImage = options.generateImage ?? defaultGenerateImage;
   return generateImage(request);
@@ -113,7 +153,7 @@ async function generate(options: ApiFlowRunnerOptions, request: ImageRequest): P
 async function persistGeneratedOutputs(
   session: CanvasSession,
   input: {
-    action: "text2img" | "img2img" | "inpaint";
+    action: "text2img" | "img2img" | "inpaint" | "video";
     model: string;
     prompt: string;
     negativePrompt?: string | undefined;
@@ -218,10 +258,33 @@ function findInputAsset(
   throw new Error(`${node.id} requires an input image asset`);
 }
 
+function findOptionalInputAsset(
+  session: CanvasSession,
+  upstreamNodes: FlowNode[],
+  upstreamResults: NodeExecutionResult[],
+  node: FlowNode,
+  dataKey: string
+) {
+  try {
+    return findInputAsset(session, upstreamNodes, upstreamResults, node, dataKey);
+  } catch {
+    return undefined;
+  }
+}
+
 function findAssetById(session: CanvasSession, assetId: string) {
   const asset = session.assets.find((item) => item.assetId === assetId);
   if (!asset) {
     throw new Error(`asset not found in session: ${assetId}`);
   }
   return asset;
+}
+
+async function providerFrom(node: FlowNode, options: ApiFlowRunnerOptions): Promise<ApiProvider | undefined> {
+  const providerId = optionalStringData(node, "providerId");
+  if (!providerId && !options.getProvider) {
+    return undefined;
+  }
+  const getProvider = options.getProvider ?? providerStore.getProvider;
+  return getProvider(providerId);
 }

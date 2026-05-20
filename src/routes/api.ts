@@ -11,7 +11,9 @@ import {
   flowExecuteSchema,
   canvasExecuteSchema,
   createCanvasSchema,
-  saveCanvasSchema
+  saveCanvasSchema,
+  saveProvidersSchema,
+  providerConnectionSchema
 } from "../types/contracts";
 import { isSupportedImageMime, saveBufferAsAsset, saveOutputAsAsset } from "../services/assets";
 import { appendVersion, attachAsset, createSession, getOrCreateSession, loadSession, saveSession } from "../services/sessions";
@@ -22,6 +24,12 @@ import { validateFlowSnapshot } from "../flows/validate";
 import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
 import { executeFlowSnapshot } from "../flows/execute";
 import { createApiFlowRunners } from "../flows/runners/api";
+import {
+  fetchProviderModels,
+  providerStore,
+  publicProvider,
+  testProviderConnection
+} from "../services/providers";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -217,6 +225,51 @@ apiRouter.post("/text2img", async (req, res) => {
       });
     }
     res.status(500).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.get("/providers", async (_req, res) => {
+  try {
+    const providers = await providerStore.loadProviders();
+    res.json({ ok: true, data: providers.map(publicProvider) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.put("/providers", async (req, res) => {
+  try {
+    const input = saveProvidersSchema.parse(req.body ?? {});
+    const providers = await providerStore.saveProviders(input.providers);
+    res.json({ ok: true, data: providers.map(publicProvider) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/providers/test-connection", async (req, res) => {
+  try {
+    const input = providerConnectionSchema.parse(req.body ?? {});
+    const apiKey = await providerApiKey(input.providerId, input.apiKey);
+    const result = await testProviderConnection({ baseUrl: input.baseUrl, apiKey });
+    res.json({ ok: true, data: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/providers/fetch-models", async (req, res) => {
+  try {
+    const input = providerConnectionSchema.parse(req.body ?? {});
+    const apiKey = await providerApiKey(input.providerId, input.apiKey);
+    const result = await fetchProviderModels({ baseUrl: input.baseUrl, apiKey });
+    res.json({ ok: true, data: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ ok: false, error: message });
   }
 });
 
@@ -510,7 +563,7 @@ apiRouter.post("/flows/execute", async (req, res) => {
   try {
     const input = canvasExecuteSchema.parse(req.body ?? {});
     const session = await getOrCreateSession(input.sessionId ?? input.flow.sessionId);
-    const runners = createApiFlowRunners({ session });
+    const runners = createApiFlowRunners({ session, getProvider: providerStore.getProvider });
     const result = await executeFlowSnapshot(input.flow, {
       sessionId: session.sessionId,
       targetNodeId: input.targetNodeId,
@@ -865,6 +918,19 @@ apiRouter.get("/templates/:name", async (req, res) => {
 
   res.json({ ok: true, data: template });
 });
+
+async function providerApiKey(providerId: string | undefined, apiKey: string | undefined): Promise<string> {
+  if (apiKey?.trim()) {
+    return apiKey.trim();
+  }
+  if (providerId) {
+    const provider = await providerStore.getProvider(providerId);
+    if (provider.apiKey?.trim()) {
+      return provider.apiKey.trim();
+    }
+  }
+  throw new Error("API key is required");
+}
 
 function validateFlow(flow: Flow): { valid: boolean; errors: string[]; order: string[] } {
   const errors: string[] = [];

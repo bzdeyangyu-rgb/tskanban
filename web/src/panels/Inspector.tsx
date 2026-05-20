@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import type { FlowExecutionNode } from "../api/client";
+import type { ApiProvider, FlowExecutionNode } from "../api/client";
 import type { TshuabuNodeMeta } from "../canvas/shapeUtils";
 
 type SelectedNode = {
@@ -8,17 +8,18 @@ type SelectedNode = {
 };
 
 type InspectorProps = {
+  providers: ApiProvider[];
   runNodes: FlowExecutionNode[];
   selectedNode: SelectedNode | null;
   onUpdateSelectedNode: (patch: Record<string, unknown>) => void;
 };
 
-export function Inspector({ runNodes, selectedNode, onUpdateSelectedNode }: InspectorProps) {
+export function Inspector({ providers, runNodes, selectedNode, onUpdateSelectedNode }: InspectorProps) {
   return (
     <section className="panel-stack">
       <h2 className="panel-heading">属性</h2>
       {selectedNode ? (
-        <NodeEditor selectedNode={selectedNode} onUpdateSelectedNode={onUpdateSelectedNode} />
+        <NodeEditor providers={providers} selectedNode={selectedNode} onUpdateSelectedNode={onUpdateSelectedNode} />
       ) : (
         <p className="muted">选中一个节点后，可以在这里编辑运行参数。</p>
       )}
@@ -43,16 +44,21 @@ export function Inspector({ runNodes, selectedNode, onUpdateSelectedNode }: Insp
 }
 
 function NodeEditor({
+  providers,
   selectedNode,
   onUpdateSelectedNode
 }: {
+  providers: ApiProvider[];
   selectedNode: SelectedNode;
   onUpdateSelectedNode: (patch: Record<string, unknown>) => void;
 }) {
   const { meta } = selectedNode;
-  const updateString = (key: string) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const updateString = (key: string) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     onUpdateSelectedNode({ [key]: event.target.value });
   };
+  const isApiNode = meta.nodeType.startsWith("api_") || meta.nodeType === "video";
+  const selectedProvider = providers.find((provider) => provider.id === stringValue(meta.data.providerId)) ?? providers[0];
+  const models = modelsForNode(selectedProvider, meta.nodeType);
 
   return (
     <div className="field-list">
@@ -64,11 +70,7 @@ function NodeEditor({
       {meta.nodeType === "prompt" ? (
         <label className="field">
           Prompt
-          <textarea
-            className="field-control field-textarea"
-            value={stringValue(meta.data.text)}
-            onChange={updateString("text")}
-          />
+          <textarea className="field-control field-textarea" value={stringValue(meta.data.text)} onChange={updateString("text")} />
         </label>
       ) : null}
 
@@ -79,11 +81,33 @@ function NodeEditor({
         </label>
       ) : null}
 
-      {meta.nodeType.startsWith("api_") ? (
+      {isApiNode ? (
         <>
           <label className="field">
+            Provider
+            <select className="field-control" value={stringValue(meta.data.providerId)} onChange={updateString("providerId")}>
+              <option value="">默认平台</option>
+              {providers.map((provider) => (
+                <option value={provider.id} key={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
             Model
-            <input className="field-control" value={stringValue(meta.data.model)} onChange={updateString("model")} />
+            {models.length > 0 ? (
+              <select className="field-control" value={stringValue(meta.data.model)} onChange={updateString("model")}>
+                <option value="">选择模型</option>
+                {models.map((model) => (
+                  <option value={model} key={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="field-control" value={stringValue(meta.data.model)} onChange={updateString("model")} />
+            )}
           </label>
           <label className="field">
             Prompt 覆盖
@@ -104,29 +128,34 @@ function NodeEditor({
         </>
       ) : null}
 
-      {meta.nodeType === "api_img2img" || meta.nodeType === "api_inpaint" ? (
+      {meta.nodeType === "api_img2img" || meta.nodeType === "api_inpaint" || meta.nodeType === "video" ? (
         <label className="field">
           Base Asset ID
-          <input
-            className="field-control"
-            value={stringValue(meta.data.baseAssetId)}
-            onChange={updateString("baseAssetId")}
-          />
+          <input className="field-control" value={stringValue(meta.data.baseAssetId)} onChange={updateString("baseAssetId")} />
         </label>
       ) : null}
 
       {meta.nodeType === "api_inpaint" ? (
         <label className="field">
           Mask Asset ID
-          <input
-            className="field-control"
-            value={stringValue(meta.data.maskAssetId)}
-            onChange={updateString("maskAssetId")}
-          />
+          <input className="field-control" value={stringValue(meta.data.maskAssetId)} onChange={updateString("maskAssetId")} />
         </label>
       ) : null}
     </div>
   );
+}
+
+function modelsForNode(provider: ApiProvider | undefined, nodeType: string): string[] {
+  if (!provider) {
+    return [];
+  }
+  if (nodeType === "video") {
+    return provider.videoModels;
+  }
+  if (nodeType.startsWith("api_")) {
+    return provider.imageModels;
+  }
+  return [];
 }
 
 function stringValue(value: unknown): string {

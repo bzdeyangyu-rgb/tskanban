@@ -86,6 +86,67 @@ button {
   border-color: #111827;
 }
 
+.api-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #d9e1ec;
+}
+
+.api-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.api-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mini-button {
+  min-height: 32px;
+  border: 1px solid #d7dfeb;
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #1f2937;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.mini-button.dark {
+  color: #ffffff;
+  border-color: #111827;
+  background: #111827;
+}
+
+.provider-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.provider-summary span {
+  min-width: 0;
+  border: 1px solid #d7dfeb;
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: #ffffff;
+}
+
+.compact {
+  margin: 0;
+}
+
 .workspace {
   position: relative;
   min-width: 0;
