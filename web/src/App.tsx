@@ -286,6 +286,14 @@ export function App() {
     setStatus(`已导出 ${asset.assetId}`);
   }, [editor]);
 
+  const handleEditorMount = useCallback(
+    (mountedEditor: Editor) => {
+      setEditor(mountedEditor);
+      seedStarterCanvas(mountedEditor, providers[0]?.id);
+    },
+    [providers]
+  );
+
   return (
     <main className="app-shell visual-shell">
       <aside className="floating-panel left-material-panel" aria-label="素材面板">
@@ -294,7 +302,7 @@ export function App() {
       </aside>
       <section className="workspace" aria-label="画布">
         <div className="project-pill">Tshuabu 画布</div>
-        <CanvasApp onFiles={handleImportFiles} onMount={setEditor} />
+        <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
         <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
       </section>
       <aside className="floating-panel right-control-panel" aria-label="控制面板">
@@ -316,6 +324,53 @@ export function App() {
       </aside>
     </main>
   );
+}
+
+function seedStarterCanvas(editor: Editor, providerId?: string): void {
+  const existingNodes = editor.getCurrentPageShapes().some((shape) => isTshuabuNodeMeta(shape.meta));
+  const seeded = window.localStorage.getItem("tshuabu:starterSeeded");
+  if (existingNodes || seeded) {
+    return;
+  }
+
+  const providerData = providerId ? { providerId } : {};
+  const nodes = [
+    {
+      type: "image" as const,
+      title: "IMAGE",
+      data: { name: "拖入图片素材", roleTag: "素材" },
+      width: 260,
+      height: 230
+    },
+    {
+      type: "prompt" as const,
+      title: "PROMPT",
+      data: { text: "输入提示词，连接到生成节点" },
+      width: 310,
+      height: 190
+    },
+    {
+      type: "api_img2img" as const,
+      title: "IMAGE API",
+      data: { ...providerData, model: "gpt-image-2", params: { strength: 0.55 } },
+      width: 320,
+      height: 210
+    },
+    {
+      type: "output" as const,
+      title: "OUTPUT",
+      data: {},
+      width: 360,
+      height: 240
+    }
+  ];
+
+  nodes.forEach((node, index) => {
+    addNodeToEditor(editor, node, index);
+  });
+  editor.selectNone();
+  editor.setCamera({ x: 70, y: 76, z: 0.92 });
+  window.localStorage.setItem("tshuabu:starterSeeded", "1");
 }
 
 function ensureOutputNode(editor: Editor, placementIndexRef: MutableRefObject<number>): void {

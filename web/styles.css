@@ -906,3 +906,302 @@ button {
     left: 332px;
   }
 }
+
+/* Infinite Canvas visual pass */
+.visual-shell {
+  --page: #0f141d;
+  --grid: rgba(148, 163, 184, 0.18);
+  --panel: rgba(17, 23, 34, 0.86);
+  --card: #171d29;
+  --soft: #111722;
+  --soft-2: #202838;
+  --line: rgba(148, 163, 184, 0.16);
+  --line-2: rgba(148, 163, 184, 0.22);
+  --text: #e5e9f0;
+  --muted: #9aa6b8;
+  --faint: #78869a;
+  --strong: #d8dee9;
+  --strong-text: #10141d;
+  --shadow: rgba(0, 0, 0, 0.2);
+}
+
+.app-shell.visual-shell {
+  background-color: var(--page);
+  background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+  color: var(--text);
+}
+
+.visual-shell .tl-background {
+  background-color: transparent;
+}
+
+.visual-shell .tl-canvas {
+  background-color: transparent;
+  background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.floating-panel {
+  border-radius: 24px;
+  border-color: var(--line);
+  background: var(--panel);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.left-material-panel {
+  top: 22px;
+  bottom: auto;
+  left: 24px;
+  width: 310px;
+  max-height: calc(100vh - 44px);
+  padding: 14px;
+}
+
+.right-control-panel {
+  top: 22px;
+  right: 24px;
+  bottom: auto;
+  width: 372px;
+  max-height: calc(100vh - 44px);
+  padding: 14px;
+}
+
+.project-pill {
+  top: 22px;
+  border-radius: 999px;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+  letter-spacing: 0.02em;
+}
+
+.asset-import-drop {
+  min-height: 118px;
+  border-color: var(--line-2);
+  border-radius: 18px;
+  background: var(--soft);
+}
+
+.asset-import-drop:hover {
+  border-color: #566174;
+  background: var(--soft-2);
+}
+
+.visual-shell .node-button,
+.visual-shell .mini-button,
+.visual-shell .field-control,
+.visual-shell .field-value,
+.visual-shell .provider-summary span,
+.visual-shell .history-kv,
+.visual-shell .history-tabs button,
+.visual-shell .history-run,
+.visual-shell .history-run-row,
+.visual-shell .version-list,
+.visual-shell .history-node,
+.visual-shell .trace-panel,
+.visual-shell .trace-step,
+.visual-shell .rag-panel,
+.visual-shell .rag-event,
+.visual-shell .run-result {
+  border-radius: 16px;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--soft);
+  box-shadow: none;
+}
+
+.visual-shell .node-button {
+  min-height: 38px;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.visual-shell .node-button:hover,
+.visual-shell .mini-button:hover,
+.visual-shell .history-tabs button:hover {
+  border-color: #566174;
+  color: var(--text);
+  background: var(--soft-2);
+}
+
+.visual-shell .node-button svg {
+  color: var(--muted);
+}
+
+.visual-shell .mini-button {
+  min-height: 34px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.visual-shell .mini-button.dark,
+.visual-shell .primary-button,
+.visual-shell .history-tabs button.active {
+  border-color: var(--strong);
+  color: var(--strong-text);
+  background: var(--strong);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.visual-shell .run-panel {
+  right: auto;
+  left: 50%;
+  bottom: 22px;
+  z-index: 28;
+  width: min(680px, calc(100vw - 760px));
+  min-width: 420px;
+  transform: translateX(-50%);
+  border-radius: 24px;
+  border-color: var(--line);
+  background: var(--panel);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+}
+
+.visual-shell .primary-button {
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.tshuabu-node-card {
+  position: relative;
+  border-radius: 22px;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--card);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+  overflow: visible;
+}
+
+.tshuabu-node-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--card);
+}
+
+.tshuabu-node-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  border: 2px solid var(--card);
+  border-radius: 999px;
+  background: var(--strong);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.tshuabu-node-head {
+  height: 42px;
+  border-radius: 21px 21px 0 0;
+  border-bottom-color: rgba(148, 163, 184, 0.14);
+  background: var(--card);
+  cursor: move;
+}
+
+.tshuabu-node-head span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tshuabu-node-head strong {
+  border-radius: 6px;
+  padding: 2px 7px;
+  color: var(--muted);
+  background: rgba(148, 163, 184, 0.14);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.tshuabu-node-body {
+  padding: 12px;
+}
+
+.node-thumb,
+.output-preview-grid img {
+  border-radius: 16px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: var(--soft);
+}
+
+.node-empty {
+  min-height: 148px;
+  border-radius: 16px;
+  border-color: rgba(148, 163, 184, 0.32);
+  color: var(--faint);
+  background: var(--soft);
+}
+
+.prompt-preview {
+  min-height: 112px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  color: var(--text);
+  background: #101725;
+}
+
+.api-preview {
+  min-height: 120px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: #101725;
+}
+
+.api-preview span {
+  color: var(--strong);
+  letter-spacing: 0.02em;
+}
+
+.api-preview small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.output-preview-grid {
+  min-height: 152px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+}
+
+.visual-shell .tlui-layout {
+  --color-panel: rgba(17, 23, 34, 0.84);
+  --color-low: #111722;
+  --color-muted-1: #9aa6b8;
+}
+
+@media (max-width: 1280px) {
+  .right-control-panel {
+    width: 340px;
+  }
+
+  .left-material-panel {
+    width: 290px;
+  }
+
+  .visual-shell .run-panel {
+    width: 440px;
+    min-width: 360px;
+  }
+}
