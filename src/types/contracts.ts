@@ -205,6 +205,8 @@ export const logsQuerySchema = z.object({
   sessionId: z.string().optional(),
   action: z.string().optional(),
   model: z.string().optional(),
+  runId: z.string().optional(),
+  assetId: z.string().optional(),
   keyword: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),

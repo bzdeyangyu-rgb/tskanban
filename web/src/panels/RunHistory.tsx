@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchAssetProvenance, type AssetProvenance, type CanvasSession } from "../api/client";
+import {
+  fetchAssetProvenance,
+  fetchRagEvents,
+  type AssetProvenance,
+  type CanvasSession,
+  type RagEvent
+} from "../api/client";
 
 export function RunHistory({ session }: { session: CanvasSession | null }) {
   const latestRun = session?.runs?.at(-1);
@@ -11,6 +17,8 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [trace, setTrace] = useState<AssetProvenance | null>(null);
   const [traceStatus, setTraceStatus] = useState("");
+  const [ragEvents, setRagEvents] = useState<RagEvent[]>([]);
+  const [ragStatus, setRagStatus] = useState("");
 
   useEffect(() => {
     setSelectedAssetId(outputAssetIds[0] ?? "");
@@ -35,6 +43,33 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
         if (!cancelled) {
           setTrace(null);
           setTraceStatus(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAssetId, session]);
+
+  useEffect(() => {
+    if (!session || !selectedAssetId) {
+      setRagEvents([]);
+      return;
+    }
+
+    let cancelled = false;
+    setRagStatus("读取 RAG 日志");
+    fetchRagEvents({ sessionId: session.sessionId, assetId: selectedAssetId, limit: 8 })
+      .then((events) => {
+        if (!cancelled) {
+          setRagEvents(events.reverse());
+          setRagStatus("");
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRagEvents([]);
+          setRagStatus(error instanceof Error ? error.message : String(error));
         }
       });
 
@@ -120,6 +155,28 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
                   {step.parentAssetIds.length > 0 ? <small>父级 {step.parentAssetIds.join(", ")}</small> : null}
                 </div>
               ))}
+            </div>
+          ) : null}
+          {selectedAssetId ? (
+            <div className="rag-panel">
+              <div className="history-run-head">
+                <strong>RAG 复盘</strong>
+                <span>{ragEvents.length}</span>
+              </div>
+              {ragStatus ? <p className="muted compact">{ragStatus}</p> : null}
+              {ragEvents.map((event) => (
+                <div className={`rag-event ${event.status}`} key={event.event_id}>
+                  <div>
+                    <strong>{event.action}</strong>
+                    <span>{event.latency_ms}ms</span>
+                  </div>
+                  <p>{event.prompt}</p>
+                  <small>
+                    {event.model} · {event.flow_id ?? event.session_id}
+                  </small>
+                </div>
+              ))}
+              {!ragStatus && ragEvents.length === 0 ? <p className="muted compact">没有匹配的 RAG 事件</p> : null}
             </div>
           ) : null}
         </div>

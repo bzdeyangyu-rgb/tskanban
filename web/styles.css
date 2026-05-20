@@ -433,3 +433,46 @@ button {
 .trace-step small {
   color: #64748b;
 }
+
+.rag-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f5f3ff;
+}
+
+.rag-event {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e9d5ff;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.rag-event.failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.rag-event div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rag-event p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.rag-event span,
+.rag-event small {
+  color: #64748b;
+}

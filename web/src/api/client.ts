@@ -98,6 +98,22 @@ export type AssetProvenance = {
   }>;
 };
 
+export type RagEvent = {
+  event_id: string;
+  timestamp: string;
+  session_id: string;
+  action: string;
+  model: string;
+  prompt: string;
+  params: Record<string, unknown>;
+  input_assets: string[];
+  output_assets: string[];
+  status: "success" | "failed";
+  latency_ms: number;
+  error_message?: string;
+  flow_id?: string;
+};
+
 export type FlowExecutionResponse = {
   sessionId: string;
   flowId: string;
@@ -143,6 +159,28 @@ export async function fetchAssetProvenance(sessionId: string, assetId: string): 
     throw new Error(json.error || "读取来源链失败");
   }
   return json.data as AssetProvenance;
+}
+
+export async function fetchRagEvents(query: {
+  sessionId?: string;
+  runId?: string;
+  assetId?: string;
+  keyword?: string;
+  limit?: number;
+}): Promise<RagEvent[]> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  }
+
+  const response = await fetch(`/api/logs?${params.toString()}`);
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "读取 RAG 日志失败");
+  }
+  return json.data as RagEvent[];
 }
 
 export async function fetchProviders(): Promise<ApiProvider[]> {

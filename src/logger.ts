@@ -50,6 +50,8 @@ export type EventQuery = {
   sessionId?: string | undefined;
   action?: string | undefined;
   model?: string | undefined;
+  runId?: string | undefined;
+  assetId?: string | undefined;
   keyword?: string | undefined;
   from?: string | undefined;
   to?: string | undefined;
@@ -171,7 +173,17 @@ export async function queryEvents(query: EventQuery): Promise<RagEvent[]> {
     })
     .filter((event): event is RagEvent => event !== null);
 
-  const filtered = all.filter((event) => {
+  const filtered = filterEvents(all, query);
+  const limit = query.limit ?? 50;
+  return filtered.slice(-limit);
+}
+
+export function filterEvents(events: RagEvent[], query: EventQuery): RagEvent[] {
+  const fromMs = query.from ? Date.parse(query.from) : Number.NEGATIVE_INFINITY;
+  const toMs = query.to ? Date.parse(query.to) : Number.POSITIVE_INFINITY;
+  const keyword = query.keyword?.toLowerCase();
+
+  return events.filter((event) => {
     if (query.sessionId && event.session_id !== query.sessionId) {
       return false;
     }
@@ -181,6 +193,14 @@ export async function queryEvents(query: EventQuery): Promise<RagEvent[]> {
     }
 
     if (query.model && event.model !== query.model) {
+      return false;
+    }
+
+    if (query.runId && !eventMatchesRun(event, query.runId)) {
+      return false;
+    }
+
+    if (query.assetId && !eventMatchesAsset(event, query.assetId)) {
       return false;
     }
 
@@ -198,7 +218,32 @@ export async function queryEvents(query: EventQuery): Promise<RagEvent[]> {
 
     return true;
   });
+}
 
-  const limit = query.limit ?? 50;
-  return filtered.slice(-limit);
+function eventMatchesRun(event: RagEvent, runId: string): boolean {
+  return event.flow_id === runId || event.params.runId === runId || event.params.sourceRunId === runId;
+}
+
+function eventMatchesAsset(event: RagEvent, assetId: string): boolean {
+  if (event.input_assets.includes(assetId) || event.output_assets.includes(assetId)) {
+    return true;
+  }
+
+  const nodeRuns = event.params.nodeRuns;
+  if (!Array.isArray(nodeRuns)) {
+    return false;
+  }
+
+  return nodeRuns.some((nodeRun) => {
+    if (!nodeRun || typeof nodeRun !== "object") {
+      return false;
+    }
+    const inputAssetIds = "inputAssetIds" in nodeRun ? nodeRun.inputAssetIds : undefined;
+    const outputAssetIds = "outputAssetIds" in nodeRun ? nodeRun.outputAssetIds : undefined;
+    return arrayIncludesString(inputAssetIds, assetId) || arrayIncludesString(outputAssetIds, assetId);
+  });
+}
+
+function arrayIncludesString(value: unknown, expected: string): boolean {
+  return Array.isArray(value) && value.some((item) => item === expected);
 }
