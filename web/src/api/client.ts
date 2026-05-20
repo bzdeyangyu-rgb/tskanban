@@ -81,6 +81,23 @@ export type CanvasSession = {
   runs?: CanvasRunRecord[];
 };
 
+export type AssetProvenance = {
+  assetId: string;
+  chain: Array<{
+    assetId: string;
+    versionId?: string;
+    parentAssetIds: string[];
+    sourceRunId?: string;
+    sourceNodeId?: string;
+    providerId?: string;
+    action?: string;
+    model?: string;
+    prompt?: string;
+    status?: string;
+    createdAt?: string;
+  }>;
+};
+
 export type FlowExecutionResponse = {
   sessionId: string;
   flowId: string;
@@ -115,6 +132,17 @@ export async function fetchSession(sessionId: string): Promise<CanvasSession> {
     throw new Error(json.error || "读取 session 失败");
   }
   return json.data as CanvasSession;
+}
+
+export async function fetchAssetProvenance(sessionId: string, assetId: string): Promise<AssetProvenance> {
+  const response = await fetch(
+    `/api/sessions/${encodeURIComponent(sessionId)}/assets/${encodeURIComponent(assetId)}/provenance`
+  );
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "读取来源链失败");
+  }
+  return json.data as AssetProvenance;
 }
 
 export async function fetchProviders(): Promise<ApiProvider[]> {

@@ -23,7 +23,8 @@ import {
   createSession,
   getOrCreateSession,
   loadSession,
-  saveSession
+  saveSession,
+  traceAssetProvenance
 } from "../services/sessions";
 import { generateImage } from "../imageApi";
 import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger";
@@ -233,6 +234,17 @@ apiRouter.post("/text2img", async (req, res) => {
       });
     }
     res.status(500).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.get("/sessions/:sessionId/assets/:assetId/provenance", async (req, res) => {
+  try {
+    const session = await loadSession(req.params.sessionId);
+    const trace = traceAssetProvenance(session, req.params.assetId);
+    res.json({ ok: true, data: trace });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(404).json({ ok: false, error: message });
   }
 });
 

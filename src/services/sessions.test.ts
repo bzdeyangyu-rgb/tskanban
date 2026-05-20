@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendRunRecord, appendVersion, type CanvasSession } from "./sessions";
+import { appendRunRecord, appendVersion, traceAssetProvenance, type CanvasSession } from "./sessions";
 import type { FlowSnapshot, NodeExecutionResult } from "../flows/types";
 
 function session(): CanvasSession {
@@ -115,5 +115,46 @@ describe("session provenance", () => {
       versionId: "v_0001"
     });
     expect(s.runs?.[0]?.snapshot.nodes.map((node) => node.id)).toEqual(["p1", "g1"]);
+  });
+
+  it("traces a generated asset back through parent assets and versions", () => {
+    const s = session();
+    appendVersion(s, {
+      action: "text2img",
+      model: "gpt-image-2",
+      prompt: "base cat",
+      params: {},
+      providerId: "miku",
+      sourceNodeId: "txt1",
+      sourceRunId: "run_1",
+      parentAssetIds: [],
+      outputAssetIds: ["base_out"],
+      selectedOutputAssetId: "base_out",
+      latencyMs: 50,
+      status: "success"
+    });
+    appendVersion(s, {
+      action: "img2img",
+      model: "gpt-image-2",
+      prompt: "make it cinematic",
+      params: { strength: 0.45 },
+      providerId: "miku",
+      sourceNodeId: "img2",
+      sourceRunId: "run_2",
+      parentAssetIds: ["base_out"],
+      baseAssetId: "base_out",
+      outputAssetIds: ["final_out"],
+      selectedOutputAssetId: "final_out",
+      latencyMs: 70,
+      status: "success"
+    });
+
+    const trace = traceAssetProvenance(s, "final_out");
+
+    expect(trace.assetId).toBe("final_out");
+    expect(trace.chain.map((item) => [item.assetId, item.versionId, item.sourceNodeId, item.prompt])).toEqual([
+      ["final_out", "v_0002", "img2", "make it cinematic"],
+      ["base_out", "v_0001", "txt1", "base cat"]
+    ]);
   });
 });

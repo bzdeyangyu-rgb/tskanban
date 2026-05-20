@@ -56,6 +56,26 @@ export type CanvasRunRecord = {
   errorMessage?: string | undefined;
 };
 
+export type AssetProvenanceStep = {
+  assetId: string;
+  versionId?: string | undefined;
+  parentAssetIds: string[];
+  sourceRunId?: string | undefined;
+  sourceNodeId?: string | undefined;
+  providerId?: string | undefined;
+  action?: string | undefined;
+  model?: string | undefined;
+  prompt?: string | undefined;
+  params?: Record<string, unknown> | undefined;
+  status?: string | undefined;
+  createdAt?: string | undefined;
+};
+
+export type AssetProvenance = {
+  assetId: string;
+  chain: AssetProvenanceStep[];
+};
+
 export type CanvasSession = {
   sessionId: string;
   title?: string | undefined;
@@ -204,4 +224,47 @@ function optionalString(value: unknown): string | undefined {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+export function traceAssetProvenance(session: CanvasSession, assetId: string): AssetProvenance {
+  const chain: AssetProvenanceStep[] = [];
+  const visited = new Set<string>();
+
+  function visit(currentAssetId: string) {
+    if (visited.has(currentAssetId)) {
+      return;
+    }
+    visited.add(currentAssetId);
+
+    const version = session.versions.find((item) => item.outputAssetIds.includes(currentAssetId));
+    if (!version) {
+      chain.push({
+        assetId: currentAssetId,
+        parentAssetIds: []
+      });
+      return;
+    }
+
+    chain.push({
+      assetId: currentAssetId,
+      versionId: version.versionId,
+      parentAssetIds: version.parentAssetIds ?? [],
+      sourceRunId: version.sourceRunId,
+      sourceNodeId: version.sourceNodeId,
+      providerId: version.providerId,
+      action: version.action,
+      model: version.model,
+      prompt: version.prompt,
+      params: version.params,
+      status: version.status,
+      createdAt: version.createdAt
+    });
+
+    for (const parentAssetId of version.parentAssetIds ?? []) {
+      visit(parentAssetId);
+    }
+  }
+
+  visit(assetId);
+  return { assetId, chain };
 }
