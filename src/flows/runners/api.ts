@@ -7,6 +7,7 @@ import type { ExecutableNodeType, FlowNode, NodeExecutionResult } from "../types
 
 export type ApiFlowRunnerOptions = {
   session: CanvasSession;
+  flowId?: string | undefined;
   generateImage?: (request: ImageRequest) => Promise<ImageResult>;
   getProvider?: (providerId?: string | undefined) => Promise<ApiProvider>;
 };
@@ -45,7 +46,11 @@ async function runApiText2Img(input: Parameters<FlowRunner>[0], options: ApiFlow
     negativePrompt,
     params,
     result,
-    latencyMs: Date.now() - started
+    latencyMs: Date.now() - started,
+    providerId: provider?.id,
+    sourceRunId: options.flowId,
+    sourceNodeId: input.node.id,
+    parentAssetIds: []
   });
 }
 
@@ -76,6 +81,10 @@ async function runApiImg2Img(input: Parameters<FlowRunner>[0], options: ApiFlowR
     params,
     result,
     latencyMs: Date.now() - started,
+    providerId: provider?.id,
+    sourceRunId: options.flowId,
+    sourceNodeId: input.node.id,
+    parentAssetIds: [base.assetId],
     baseAssetId: base.assetId
   });
 }
@@ -109,6 +118,10 @@ async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowR
     params,
     result,
     latencyMs: Date.now() - started,
+    providerId: provider?.id,
+    sourceRunId: options.flowId,
+    sourceNodeId: input.node.id,
+    parentAssetIds: [base.assetId, mask.assetId],
     baseAssetId: base.assetId,
     maskAssetId: mask.assetId
   });
@@ -141,6 +154,10 @@ async function runApiVideo(input: Parameters<FlowRunner>[0], options: ApiFlowRun
     params,
     result,
     latencyMs: Date.now() - started,
+    providerId: provider?.id,
+    sourceRunId: options.flowId,
+    sourceNodeId: input.node.id,
+    parentAssetIds: base ? [base.assetId] : [],
     baseAssetId: base?.assetId
   });
 }
@@ -160,6 +177,10 @@ async function persistGeneratedOutputs(
     params?: Record<string, unknown> | undefined;
     result: ImageResult;
     latencyMs: number;
+    providerId?: string | undefined;
+    sourceRunId?: string | undefined;
+    sourceNodeId?: string | undefined;
+    parentAssetIds?: string[] | undefined;
     baseAssetId?: string | undefined;
     maskAssetId?: string | undefined;
   }
@@ -182,6 +203,10 @@ async function persistGeneratedOutputs(
     prompt: input.prompt,
     negativePrompt: input.negativePrompt,
     params: input.params ?? {},
+    providerId: input.providerId,
+    sourceRunId: input.sourceRunId,
+    sourceNodeId: input.sourceNodeId,
+    parentAssetIds: input.parentAssetIds,
     baseAssetId: input.baseAssetId,
     maskAssetId: input.maskAssetId,
     outputAssetIds: outputAssets.map((asset) => asset.assetId),
@@ -195,6 +220,15 @@ async function persistGeneratedOutputs(
     outputAssets: outputAssets.map((asset) => ({ assetId: asset.assetId, url: asset.publicUrl })),
     data: {
       versionId: version.versionId,
+      providerId: input.providerId,
+      sourceRunId: input.sourceRunId,
+      sourceNodeId: input.sourceNodeId,
+      model: input.model,
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      params: input.params ?? {},
+      parentAssetIds: input.parentAssetIds ?? [],
+      inputAssetIds: input.parentAssetIds ?? [],
       raw: input.result.raw
     }
   };

@@ -56,7 +56,9 @@ export type NodeExecutionResult = {
   status: FlowNodeStatus;
   attempts: number;
   latencyMs: number;
+  inputAssetIds?: string[] | undefined;
   outputAssetIds: string[];
   outputAssets?: Array<{ assetId: string; url: string }> | undefined;
+  data?: Record<string, unknown> | undefined;
   errorMessage?: string | undefined;
 };

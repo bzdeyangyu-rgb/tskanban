@@ -16,7 +16,15 @@ import {
   providerConnectionSchema
 } from "../types/contracts";
 import { isSupportedImageMime, saveBufferAsAsset, saveOutputAsAsset } from "../services/assets";
-import { appendVersion, attachAsset, createSession, getOrCreateSession, loadSession, saveSession } from "../services/sessions";
+import {
+  appendRunRecord,
+  appendVersion,
+  attachAsset,
+  createSession,
+  getOrCreateSession,
+  loadSession,
+  saveSession
+} from "../services/sessions";
 import { generateImage } from "../imageApi";
 import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger";
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
@@ -558,16 +566,33 @@ apiRouter.get("/canvases/:canvasId", async (req, res) => {
 
 apiRouter.post("/flows/execute", async (req, res) => {
   const flowId = createFlowId();
+  const runId = flowId;
+  const startedAt = new Date().toISOString();
   const started = Date.now();
 
   try {
     const input = canvasExecuteSchema.parse(req.body ?? {});
     const session = await getOrCreateSession(input.sessionId ?? input.flow.sessionId);
-    const runners = createApiFlowRunners({ session, getProvider: providerStore.getProvider });
+    const runners = createApiFlowRunners({ session, flowId: runId, getProvider: providerStore.getProvider });
     const result = await executeFlowSnapshot(input.flow, {
       sessionId: session.sessionId,
       targetNodeId: input.targetNodeId,
       runners
+    });
+    const completedAt = new Date().toISOString();
+    const latencyMs = Date.now() - started;
+    const runRecord = appendRunRecord(session, {
+      runId,
+      flowId,
+      canvasId: input.flow.canvasId,
+      targetNodeId: input.targetNodeId,
+      status: result.ok ? "success" : "failed",
+      startedAt,
+      completedAt,
+      latencyMs,
+      snapshot: input.flow,
+      nodes: result.nodes,
+      errorMessage: result.error
     });
     await saveSession(session);
 
@@ -580,7 +605,9 @@ apiRouter.post("/flows/execute", async (req, res) => {
         params: {
           canvasId: input.flow.canvasId,
           targetNodeId: input.targetNodeId,
-          ok: result.ok
+          ok: result.ok,
+          runId: runRecord.runId,
+          nodeRuns: runRecord.nodes
         },
         inputAssets: []
       }),
@@ -591,7 +618,7 @@ apiRouter.post("/flows/execute", async (req, res) => {
       },
       output_assets: result.nodes.flatMap((node) => (node.outputAssets ?? []).map((asset) => asset.url)),
       status: result.ok ? "success" : "failed",
-      latency_ms: Date.now() - started,
+      latency_ms: latencyMs,
       error_message: result.error
     });
 
@@ -601,8 +628,10 @@ apiRouter.post("/flows/execute", async (req, res) => {
       data: {
         sessionId: session.sessionId,
         flowId,
+        runId,
         nodes: result.nodes,
-        outputAssets: result.nodes.flatMap((node) => node.outputAssets ?? [])
+        outputAssets: result.nodes.flatMap((node) => node.outputAssets ?? []),
+        run: runRecord
       }
     });
   } catch (error) {

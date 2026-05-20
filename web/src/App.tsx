@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Editor } from "tldraw";
-import { executeCanvasFlow, fetchProviders, type ApiProvider, type FlowExecutionNode } from "./api/client";
+import {
+  executeCanvasFlow,
+  fetchProviders,
+  fetchSession,
+  type ApiProvider,
+  type CanvasSession,
+  type FlowExecutionNode
+} from "./api/client";
 import { CanvasApp } from "./canvas/CanvasApp";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
 import type { CanvasNodeKind } from "./canvas/flowTypes";
@@ -15,6 +22,7 @@ import { ApiSettings } from "./panels/ApiSettings";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunPanel } from "./panels/RunPanel";
+import { RunHistory } from "./panels/RunHistory";
 
 type SelectedNode = {
   id: string;
@@ -27,6 +35,7 @@ export function App() {
   const [lastRunNodes, setLastRunNodes] = useState<FlowExecutionNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
   const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [session, setSession] = useState<CanvasSession | null>(null);
   const placementIndexRef = useRef(0);
   const canvasId = useMemo(() => `c_web_${Date.now().toString(36)}`, []);
 
@@ -129,6 +138,7 @@ export function App() {
       setStatus(`提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`);
       const result = await executeCanvasFlow(snapshot);
       setLastRunNodes(result.nodes);
+      setSession(await fetchSession(result.sessionId));
       addOutputImagesToEditor(editor, result.outputAssets);
       setStatus(`执行完成：${result.nodes.length} 个节点有状态`);
     } catch (error) {
@@ -153,6 +163,7 @@ export function App() {
           selectedNode={selectedNode}
           onUpdateSelectedNode={handleUpdateSelectedNode}
         />
+        <RunHistory session={session} />
       </aside>
     </main>
   );

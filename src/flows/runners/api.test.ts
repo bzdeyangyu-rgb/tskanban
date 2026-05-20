@@ -67,6 +67,16 @@ describe("api flow runners", () => {
     expect(result?.outputAssets?.[0]?.url).toMatch(/^\/outputs\//);
     expect(s.assets).toHaveLength(3);
     expect(s.versions[0]?.action).toBe("text2img");
+    expect(s.versions[0]).toMatchObject({
+      sourceNodeId: "g1",
+      parentAssetIds: []
+    });
+    expect(result?.data).toMatchObject({
+      versionId: "v_0001",
+      model: "m1",
+      prompt: "hello prompt",
+      parentAssetIds: []
+    });
   });
 
   it("runs inpaint with base and mask assets from node data", async () => {
@@ -99,6 +109,10 @@ describe("api flow runners", () => {
     ]);
     expect(result?.outputAssets?.[0]).toEqual(expect.objectContaining({ url: "https://example.com/out.png" }));
     expect(s.versions[0]?.action).toBe("inpaint");
+    expect(s.versions[0]).toMatchObject({
+      sourceNodeId: "g1",
+      parentAssetIds: ["base1", "mask1"]
+    });
   });
 
   it("runs img2img with an upstream image asset", async () => {
@@ -129,5 +143,9 @@ describe("api flow runners", () => {
       }
     ]);
     expect(s.versions[0]?.action).toBe("img2img");
+    expect(s.versions[0]).toMatchObject({
+      sourceNodeId: "g1",
+      parentAssetIds: ["base1"]
+    });
   });
 });

@@ -43,6 +43,29 @@ describe("executeFlowSnapshot", () => {
     expect(result.nodes.find((node) => node.nodeId === "g1")?.outputAssetIds).toEqual(["a_out"]);
   });
 
+  it("keeps runner metadata on executable node results", async () => {
+    const result = await executeFlowSnapshot(baseFlow(), {
+      sessionId: "s1",
+      runners: {
+        api_text2img: async () => ({
+          outputAssetIds: ["a_out"],
+          data: {
+            versionId: "v_0001",
+            prompt: "hello",
+            model: "fake"
+          }
+        })
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.nodes.find((node) => node.nodeId === "g1")?.data).toEqual({
+      versionId: "v_0001",
+      prompt: "hello",
+      model: "fake"
+    });
+  });
+
   it("retries failed executable nodes and records attempts", async () => {
     let attempts = 0;
     const result = await executeFlowSnapshot(baseFlow(), {

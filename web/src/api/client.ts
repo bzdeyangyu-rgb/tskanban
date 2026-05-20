@@ -24,16 +24,70 @@ export type FlowExecutionNode = {
   status: string;
   attempts: number;
   latencyMs: number;
+  inputAssetIds?: string[];
   outputAssetIds: string[];
   outputAssets?: Array<{ assetId: string; url: string }>;
+  data?: Record<string, unknown>;
   errorMessage?: string;
+};
+
+export type CanvasRunNode = {
+  nodeId: string;
+  nodeType: string;
+  status: string;
+  attempts: number;
+  latencyMs: number;
+  providerId?: string;
+  model?: string;
+  prompt?: string;
+  versionId?: string;
+  inputAssetIds: string[];
+  outputAssetIds: string[];
+  errorMessage?: string;
+};
+
+export type CanvasRunRecord = {
+  runId: string;
+  flowId: string;
+  canvasId: string;
+  targetNodeId?: string;
+  status: "success" | "failed";
+  startedAt: string;
+  completedAt: string;
+  latencyMs: number;
+  nodes: CanvasRunNode[];
+  outputAssetIds: string[];
+  errorMessage?: string;
+};
+
+export type CanvasSession = {
+  sessionId: string;
+  title?: string;
+  createdAt: string;
+  updatedAt: string;
+  currentVersionId?: string;
+  versions: Array<{
+    versionId: string;
+    sourceRunId?: string;
+    sourceNodeId?: string;
+    providerId?: string;
+    action: string;
+    model: string;
+    prompt: string;
+    parentAssetIds?: string[];
+    outputAssetIds: string[];
+    status: string;
+  }>;
+  runs?: CanvasRunRecord[];
 };
 
 export type FlowExecutionResponse = {
   sessionId: string;
   flowId: string;
+  runId: string;
   nodes: FlowExecutionNode[];
   outputAssets: Array<{ assetId: string; url: string }>;
+  run: CanvasRunRecord;
 };
 
 export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecutionResponse> {
@@ -52,6 +106,15 @@ export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecu
   }
 
   return json.data as FlowExecutionResponse;
+}
+
+export async function fetchSession(sessionId: string): Promise<CanvasSession> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "读取 session 失败");
+  }
+  return json.data as CanvasSession;
 }
 
 export async function fetchProviders(): Promise<ApiProvider[]> {

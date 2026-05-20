@@ -85,8 +85,10 @@ export async function executeFlowSnapshot(
           status: "success",
           attempts: attempt,
           started,
+          inputAssetIds: Array.isArray(output.data?.inputAssetIds) ? output.data.inputAssetIds.filter(isString) : undefined,
           outputAssetIds: output.outputAssetIds,
-          outputAssets: output.outputAssets
+          outputAssets: output.outputAssets,
+          data: output.data
         });
         results.push(success);
         resultsByNodeId.set(node.id, success);
@@ -148,7 +150,9 @@ function createResult(input: {
   attempts: number;
   started: number;
   outputAssetIds: string[];
+  inputAssetIds?: string[] | undefined;
   outputAssets?: Array<{ assetId: string; url: string }> | undefined;
+  data?: Record<string, unknown> | undefined;
   errorMessage?: string | undefined;
 }): NodeExecutionResult {
   return {
@@ -157,8 +161,14 @@ function createResult(input: {
     status: input.status,
     attempts: input.attempts,
     latencyMs: Date.now() - input.started,
+    inputAssetIds: input.inputAssetIds,
     outputAssetIds: input.outputAssetIds,
     outputAssets: input.outputAssets,
+    data: input.data,
     errorMessage: input.errorMessage
   };
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }

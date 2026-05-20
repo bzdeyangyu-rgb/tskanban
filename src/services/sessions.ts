@@ -2,15 +2,20 @@ import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import type { AssetMeta } from "./assets";
+import type { FlowSnapshot, NodeExecutionResult } from "../flows/types";
 
 export type CanvasVersion = {
   versionId: string;
   parentVersionId?: string | undefined;
+  sourceRunId?: string | undefined;
+  sourceNodeId?: string | undefined;
+  providerId?: string | undefined;
   action: "text2img" | "img2img" | "inpaint" | "video";
   model: string;
   prompt: string;
   negativePrompt?: string | undefined;
   params: Record<string, unknown>;
+  parentAssetIds?: string[] | undefined;
   baseAssetId?: string | undefined;
   maskAssetId?: string | undefined;
   outputAssetIds: string[];
@@ -18,6 +23,36 @@ export type CanvasVersion = {
   createdAt: string;
   latencyMs: number;
   status: "success" | "failed";
+  errorMessage?: string | undefined;
+};
+
+export type CanvasRunNode = {
+  nodeId: string;
+  nodeType: string;
+  status: string;
+  attempts: number;
+  latencyMs: number;
+  providerId?: string | undefined;
+  model?: string | undefined;
+  prompt?: string | undefined;
+  versionId?: string | undefined;
+  inputAssetIds: string[];
+  outputAssetIds: string[];
+  errorMessage?: string | undefined;
+};
+
+export type CanvasRunRecord = {
+  runId: string;
+  flowId: string;
+  canvasId: string;
+  targetNodeId?: string | undefined;
+  status: "success" | "failed";
+  startedAt: string;
+  completedAt: string;
+  latencyMs: number;
+  snapshot: FlowSnapshot;
+  nodes: CanvasRunNode[];
+  outputAssetIds: string[];
   errorMessage?: string | undefined;
 };
 
@@ -29,6 +64,7 @@ export type CanvasSession = {
   currentVersionId?: string | undefined;
   versions: CanvasVersion[];
   assets: AssetMeta[];
+  runs?: CanvasRunRecord[] | undefined;
 };
 
 const ROOT = process.cwd();
@@ -98,11 +134,15 @@ export function appendVersion(
     versionId: nextVersionId(session),
     createdAt: new Date().toISOString(),
     parentVersionId: input.parentVersionId,
+    sourceRunId: input.sourceRunId,
+    sourceNodeId: input.sourceNodeId,
+    providerId: input.providerId,
     action: input.action,
     model: input.model,
     prompt: input.prompt,
     negativePrompt: input.negativePrompt,
     params: input.params,
+    parentAssetIds: input.parentAssetIds,
     baseAssetId: input.baseAssetId,
     maskAssetId: input.maskAssetId,
     outputAssetIds: input.outputAssetIds,
@@ -115,4 +155,53 @@ export function appendVersion(
   session.versions.push(version);
   session.currentVersionId = version.versionId;
   return version;
+}
+
+export function appendRunRecord(
+  session: CanvasSession,
+  input: Omit<CanvasRunRecord, "nodes" | "outputAssetIds"> & { nodes: NodeExecutionResult[] }
+): CanvasRunRecord {
+  const nodes = input.nodes.map((node) => {
+    const data = node.data ?? {};
+    return {
+      nodeId: node.nodeId,
+      nodeType: node.nodeType,
+      status: node.status,
+      attempts: node.attempts,
+      latencyMs: node.latencyMs,
+      providerId: optionalString(data.providerId),
+      model: optionalString(data.model),
+      prompt: optionalString(data.prompt),
+      versionId: optionalString(data.versionId),
+      inputAssetIds: node.inputAssetIds ?? stringArray(data.inputAssetIds),
+      outputAssetIds: node.outputAssetIds,
+      errorMessage: node.errorMessage
+    };
+  });
+
+  const record: CanvasRunRecord = {
+    runId: input.runId,
+    flowId: input.flowId,
+    canvasId: input.canvasId,
+    targetNodeId: input.targetNodeId,
+    status: input.status,
+    startedAt: input.startedAt,
+    completedAt: input.completedAt,
+    latencyMs: input.latencyMs,
+    snapshot: input.snapshot,
+    nodes,
+    outputAssetIds: nodes.flatMap((node) => node.outputAssetIds),
+    errorMessage: input.errorMessage
+  };
+
+  session.runs = [...(session.runs ?? []), record];
+  return record;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
