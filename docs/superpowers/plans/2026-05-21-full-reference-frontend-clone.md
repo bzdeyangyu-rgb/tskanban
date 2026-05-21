@@ -456,3 +456,37 @@ Expected: PASS。
 ## 暂停点
 
 这份计划完成后先不要继续实现，等用户确认报告和计划方向。确认后再开工。
+
+## 2026-05-21 用户确认后的修正
+
+用户已确认不要小修小改，按完整案例前端复刻方向开工。同时补充要求：
+
+1. 左侧案例里的 `文生图`、`细节增强`、`图片编辑`、`角度控制`、`GPT 对话` 都可以保留并做成可用页面。
+2. 这些页面全部调用我们自己的 API 能力，不依赖 ComfyUI。
+3. `ComfyUI 设置` 不作为第一阶段业务入口。为了避免误导，实施时应从底部设置区移除，或保留为 disabled 状态并标注“暂不使用”。推荐移除。
+4. `API 设置` 仍然只放在底部设置区，不放在左侧上方导航。
+5. `本地素材` 不作为左侧一级入口，只属于无限画布内部的图片节点、拖拽上传和粘贴上传能力。
+
+因此 Task 1 的底部设置区修正为：
+
+```tsx
+<button className="side-pill" onClick={() => setTheme("dark")}>黑夜模式</button>
+<button className="side-pill">中文</button>
+<button className="side-pill" onClick={() => setActivePage("api-settings")}>API 设置</button>
+```
+
+左侧上方导航保留：
+
+```ts
+const studioNavItems = [
+  { id: "zimage", label: "文生图", icon: Image },
+  { id: "enhance", label: "细节增强", icon: Zap },
+  { id: "klein", label: "图片编辑", icon: Edit3 },
+  { id: "angle", label: "角度控制", icon: Box },
+  { id: "online", label: "在线生图", icon: Globe2 },
+  { id: "gpt-chat", label: "GPT 对话", icon: MessageSquare },
+  { id: "canvas", label: "无限画布", icon: Grid3X3 }
+];
+```
+
+新增实施原则：先复刻页面和布局，再把每个页面接到 API。没有接好的页面可以显示案例式空状态，但不能伪装成已完成。

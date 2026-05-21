@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
 import {
+  Box,
   Download,
   Edit3,
   FolderOpen,
@@ -18,7 +19,6 @@ import {
   Settings,
   Sun,
   Trash2,
-  Workflow,
   X,
   Zap,
   type LucideIcon
@@ -71,6 +71,8 @@ type CanvasGateItem = {
 
 type DrawerMode = "assets" | "nodes" | "settings" | "history" | null;
 
+type StudioPageId = "zimage" | "enhance" | "klein" | "angle" | "online" | "gpt-chat" | "canvas" | "api-settings";
+
 type DragLink = {
   x1: number;
   y1: number;
@@ -89,6 +91,58 @@ type LinkCommandMenu = {
 
 const CANVAS_LIST_KEY = "tshuabu:canvasGateItems";
 
+const studioNavItems: Array<{ id: Exclude<StudioPageId, "api-settings">; label: string; icon: LucideIcon }> = [
+  { id: "zimage", label: "\u6587\u751f\u56fe", icon: Image },
+  { id: "enhance", label: "\u7ec6\u8282\u589e\u5f3a", icon: Zap },
+  { id: "klein", label: "\u56fe\u7247\u7f16\u8f91", icon: Edit3 },
+  { id: "angle", label: "\u89d2\u5ea6\u63a7\u5236", icon: Box },
+  { id: "online", label: "\u5728\u7ebf\u751f\u56fe", icon: Globe2 },
+  { id: "gpt-chat", label: "GPT \u5bf9\u8bdd", icon: MessageSquare },
+  { id: "canvas", label: "\u65e0\u9650\u753b\u5e03", icon: Grid3X3 }
+];
+
+const apiPageCopy: Record<
+  Exclude<StudioPageId, "canvas" | "api-settings">,
+  { kicker: string; title: string; description: string; actions: string[] }
+> = {
+  zimage: {
+    kicker: "Text to Image",
+    title: "\u6587\u751f\u56fe",
+    description: "\u4fdd\u7559\u53c2\u8003\u9879\u76ee\u7684\u72ec\u7acb\u5165\u53e3\uff0c\u540e\u7eed\u76f4\u63a5\u8c03\u7528\u6211\u4eec\u7684\u56fe\u50cf\u751f\u6210 API\uff0c\u4e0d\u63a5 ComfyUI\u3002",
+    actions: ["\u63d0\u793a\u8bcd", "\u5c3a\u5bf8", "\u98ce\u683c", "\u751f\u6210"]
+  },
+  enhance: {
+    kicker: "Detail Enhance",
+    title: "\u7ec6\u8282\u589e\u5f3a",
+    description: "\u7528\u4e8e\u653e\u5927\u3001\u9510\u5316\u3001\u8d28\u611f\u8865\u5f3a\u548c\u7ec6\u8282\u91cd\u7ed8\uff0c\u80fd\u529b\u5c42\u8d70\u7edf\u4e00 API Provider\u3002",
+    actions: ["\u4e0a\u4f20\u56fe\u7247", "\u589e\u5f3a\u5f3a\u5ea6", "\u4fdd\u771f\u5ea6", "\u5f00\u59cb\u589e\u5f3a"]
+  },
+  klein: {
+    kicker: "Image Edit",
+    title: "\u56fe\u7247\u7f16\u8f91",
+    description: "\u627f\u63a5\u5c40\u90e8\u91cd\u7ed8\u3001\u64e6\u9664\u3001\u66ff\u6362\u548c\u7f16\u8f91\u6307\u4ee4\uff0c\u4ea4\u4e92\u4fdd\u6301\u53c2\u8003\u9879\u76ee\u7684\u529f\u80fd\u5206\u533a\u3002",
+    actions: ["\u9009\u62e9\u56fe\u7247", "\u7f16\u8f91\u6307\u4ee4", "\u8499\u7248", "\u63d0\u4ea4\u7f16\u8f91"]
+  },
+  angle: {
+    kicker: "Angle Control",
+    title: "\u89d2\u5ea6\u63a7\u5236",
+    description: "\u7528\u4e8e\u89c6\u89d2\u53d8\u5316\u3001\u6784\u56fe\u63a7\u5236\u548c\u53c2\u8003\u56fe\u7ea6\u675f\uff0c\u540e\u7aef\u7edf\u4e00\u6620\u5c04\u5230\u53ef\u7528\u6a21\u578b\u53c2\u6570\u3002",
+    actions: ["\u53c2\u8003\u56fe", "\u89d2\u5ea6", "\u6784\u56fe", "\u751f\u6210\u53d8\u4f53"]
+  },
+  online: {
+    kicker: "Online Render",
+    title: "\u5728\u7ebf\u751f\u56fe",
+    description: "\u4f5c\u4e3a\u8f7b\u91cf\u751f\u6210\u5165\u53e3\uff0c\u9002\u5408\u5feb\u901f\u6d4b\u8bd5\u6a21\u578b\u3001\u63d0\u793a\u8bcd\u548c\u53c2\u6570\u9884\u8bbe\u3002",
+    actions: ["\u6a21\u578b", "\u63d0\u793a\u8bcd", "\u6279\u91cf\u6570", "\u5728\u7ebf\u751f\u6210"]
+  },
+  "gpt-chat": {
+    kicker: "GPT Chat",
+    title: "GPT \u5bf9\u8bdd",
+    description: "\u4fdd\u7559\u53c2\u8003\u9879\u76ee\u7684\u5bf9\u8bdd\u5165\u53e3\uff0c\u7528\u6211\u4eec\u7684 API \u505a\u521b\u610f\u6c9f\u901a\u3001\u63d0\u793a\u8bcd\u6574\u7406\u548c\u6d41\u7a0b\u5efa\u8bae\u3002",
+    actions: ["\u4f1a\u8bdd", "\u4e0a\u4e0b\u6587", "\u63d0\u793a\u8bcd\u4f18\u5316", "\u53d1\u9001"]
+  }
+};
+
 export function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [status, setStatus] = useState("等待画布输入");
@@ -99,6 +153,7 @@ export function App() {
   const [savedAt, setSavedAt] = useState("");
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [activePage, setActivePage] = useState<StudioPageId>("canvas");
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
   const placementIndexRef = useRef(0);
@@ -270,7 +325,7 @@ export function App() {
     }
 
     editor.setCurrentTool("arrow");
-    setStatus("连接模式：从一个节点拖箭头到另一个节点");
+    setStatus("连接模式：从一个节点拖出连线到另一个节点");
   }, [editor]);
 
   const handleUpdateSelectedNode = useCallback(
@@ -453,99 +508,116 @@ export function App() {
 
   return (
     <main className="studio-app-shell">
-      <StudioSidebar onOpenDrawer={setDrawerMode} activeMode={drawerMode} />
-      <section className={`studio-stage ${isCanvasOpen ? "is-editor" : "is-gate"}`} aria-label="Tshuabu 工作区">
-        <div className={`studio-canvas-shell ${isCanvasOpen ? "canvas-open" : "no-canvas"}`}>
-          {!isCanvasOpen ? (
-            <CanvasGate
-              items={canvasItems}
-              onClear={handleClearCanvases}
-              onNew={handleNewCanvas}
-              onOpen={handleOpenCanvas}
-              onRefresh={handleRefreshCanvases}
-            />
-          ) : (
-            <>
-              <CanvasEditorTopbar
+      <StudioSidebar
+        activePage={activePage}
+        onSwitch={(page) => {
+          setActivePage(page);
+          setDrawerMode(null);
+          setLinkCommandMenu(null);
+        }}
+      />
+      <section
+        className={`studio-stage ${activePage === "canvas" && isCanvasOpen ? "is-editor" : "is-gate"}`}
+        aria-label="Side 工作区"
+      >
+        {activePage === "canvas" ? (
+          <>
+            <div className={`studio-canvas-shell ${isCanvasOpen ? "canvas-open" : "no-canvas"}`}>
+              {!isCanvasOpen ? (
+                <CanvasGate
+                  items={canvasItems}
+                  onClear={handleClearCanvases}
+                  onNew={handleNewCanvas}
+                  onOpen={handleOpenCanvas}
+                  onRefresh={handleRefreshCanvases}
+                />
+              ) : (
+                <>
+                  <CanvasEditorTopbar
+                    savedAt={savedAt}
+                    status={status}
+                    onClose={() => {
+                      setIsCanvasOpen(false);
+                      setDrawerMode(null);
+                    }}
+                    onExport={handleExportSelected}
+                    onLoad={handleLoadCanvas}
+                    onRun={handleRun}
+                    onSave={handleSaveCanvas}
+                  />
+                  <section className="workspace studio-workspace" aria-label="画布">
+                    <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
+                    <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
+                  </section>
+                </>
+              )}
+            </div>
+            {isCanvasOpen ? (
+              <StudioDrawer
+                mode={drawerMode}
+                editor={editor}
+                providers={providers}
+                selectedNode={selectedNode}
+                session={session}
                 savedAt={savedAt}
-                status={status}
-                onClose={() => {
-                  setIsCanvasOpen(false);
-                  setDrawerMode(null);
-                }}
+                canvasId={canvasId}
+                lastRunNodes={lastRunNodes}
+                onAddNode={handleAddNode}
+                onClose={() => setDrawerMode(null)}
+                onConnectMode={handleConnectMode}
                 onExport={handleExportSelected}
+                onFiles={handleImportFiles}
                 onLoad={handleLoadCanvas}
-                onRun={handleRun}
+                onProvidersChange={setProviders}
                 onSave={handleSaveCanvas}
+                onUpdateSelectedNode={handleUpdateSelectedNode}
               />
-              <section className="workspace studio-workspace" aria-label="画布">
-                <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
-                <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
-              </section>
-            </>
-          )}
-        </div>
-        {isCanvasOpen ? (
-          <StudioDrawer
-            mode={drawerMode}
-            editor={editor}
-            providers={providers}
-            selectedNode={selectedNode}
-            session={session}
-            savedAt={savedAt}
-            canvasId={canvasId}
-            lastRunNodes={lastRunNodes}
-            onAddNode={handleAddNode}
-            onClose={() => setDrawerMode(null)}
-            onConnectMode={handleConnectMode}
-            onExport={handleExportSelected}
-            onFiles={handleImportFiles}
-            onLoad={handleLoadCanvas}
-            onProvidersChange={setProviders}
-            onSave={handleSaveCanvas}
-            onUpdateSelectedNode={handleUpdateSelectedNode}
-          />
-        ) : null}
-        {dragLink ? <LinkDragPreview link={dragLink} /> : null}
-        {linkCommandMenu ? (
-          <LinkCommandPopover
-            menu={linkCommandMenu}
-            onClose={() => setLinkCommandMenu(null)}
-            onCreate={handleCreateLinkedNode}
-          />
-        ) : null}
+            ) : null}
+            {dragLink ? <LinkDragPreview link={dragLink} /> : null}
+            {linkCommandMenu ? (
+              <LinkCommandPopover
+                menu={linkCommandMenu}
+                onClose={() => setLinkCommandMenu(null)}
+                onCreate={handleCreateLinkedNode}
+              />
+            ) : null}
+          </>
+        ) : activePage === "api-settings" ? (
+          <section className="studio-page-frame studio-api-page" aria-label="API 设置">
+            <ApiSettings providers={providers} onProvidersChange={setProviders} />
+          </section>
+        ) : (
+          <StudioApiPage pageId={activePage} />
+        )}
         <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
-        <QuickFloat onOpenSettings={() => setDrawerMode("settings")} onNewCanvas={handleNewCanvas} />
       </section>
     </main>
   );
 }
 
-function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; onOpenDrawer: (mode: DrawerMode) => void }) {
-  const navItems = [
-    { key: "assets" as const, label: "本地素材", icon: Image },
-    { key: "nodes" as const, label: "节点工具", icon: Zap },
-    { key: "settings" as const, label: "API 设置", icon: Globe2 },
-    { key: "history" as const, label: "运行记录", icon: MessageSquare },
-    { key: "assets" as const, label: "无限画布", icon: Grid3X3 }
-  ];
-
+function StudioSidebar({
+  activePage,
+  onSwitch
+}: {
+  activePage: StudioPageId;
+  onSwitch: (page: StudioPageId) => void;
+}) {
   return (
     <aside className="studio-sidebar" aria-label="主导航">
-      <button className="studio-logo" type="button" aria-label="Tshuabu 首页">
+      <button className="studio-logo" type="button" aria-label="Side 首页" onClick={() => onSwitch("canvas")}>
         <span />
       </button>
       <nav className="studio-nav">
-        {navItems.map((item, index) => {
+        {studioNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeMode === item.key || (!activeMode && index === navItems.length - 1);
+          const isActive = activePage === item.id;
           return (
             <button
               className={`studio-nav-item ${isActive ? "is-active" : ""}`}
               type="button"
-              key={`${item.label}-${index}`}
+              key={item.id}
               title={item.label}
-              onClick={() => onOpenDrawer(activeMode === item.key ? null : item.key)}
+              onClick={() => onSwitch(item.id)}
             >
               <Icon aria-hidden="true" size={18} />
               <span>{item.label}</span>
@@ -554,21 +626,22 @@ function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; o
         })}
       </nav>
       <div className="studio-side-actions" aria-label="辅助操作">
-        <button type="button" title="主题">
+        <button type="button" title="黑夜模式">
           <Sun aria-hidden="true" size={16} />
           <span>黑夜模式</span>
         </button>
-        <button type="button" title="语言">
+        <button type="button" title="中文">
           <Languages aria-hidden="true" size={16} />
           <span>中文</span>
         </button>
-        <button type="button" title="API 设置" onClick={() => onOpenDrawer("settings")}>
+        <button
+          type="button"
+          title="API 设置"
+          className={activePage === "api-settings" ? "is-active" : ""}
+          onClick={() => onSwitch("api-settings")}
+        >
           <Link aria-hidden="true" size={16} />
           <span>API 设置</span>
-        </button>
-        <button type="button" title="ComfyUI 设置" onClick={() => onOpenDrawer("settings")}>
-          <Workflow aria-hidden="true" size={16} />
-          <span>ComfyUI 设置</span>
         </button>
       </div>
       <div className="studio-author">Side</div>
@@ -576,6 +649,33 @@ function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; o
   );
 }
 
+function StudioApiPage({
+  pageId
+}: {
+  pageId: Exclude<StudioPageId, "canvas" | "api-settings">;
+}) {
+  const page = apiPageCopy[pageId];
+  return (
+    <section className="studio-page-frame studio-api-feature" aria-label={page.title}>
+      <div className="studio-feature-panel">
+        <span className="studio-feature-kicker">{page.kicker}</span>
+        <h1>{page.title}</h1>
+        <p>{page.description}</p>
+        <div className="studio-feature-flow" aria-label={`${page.title} API 流程`}>
+          {page.actions.map((action, index) => (
+            <span key={action}>
+              {index + 1}. {action}
+            </span>
+          ))}
+        </div>
+        <button type="button" className="studio-feature-primary">
+          <Plus aria-hidden="true" size={16} />
+          新建任务
+        </button>
+      </div>
+    </section>
+  );
+}
 function CanvasGate({
   items,
   onClear,
@@ -768,7 +868,7 @@ function StudioDrawer({
     <aside className="studio-drawer panel" aria-label="工具抽屉">
       <header className="studio-drawer-head">
         <strong>{drawerTitle(mode)}</strong>
-        <button type="button" onClick={onClose} title="关闭">
+        <button type="button" onClick={onClose} title="鍏抽棴">
           <X aria-hidden="true" size={16} />
         </button>
       </header>
@@ -788,11 +888,11 @@ function StudioDrawer({
 
 function QuickFloat({ onNewCanvas, onOpenSettings }: { onNewCanvas: () => void; onOpenSettings: () => void }) {
   return (
-    <div className="studio-quick-float" aria-label="快捷操作">
+    <div className="studio-quick-float" aria-label="蹇嵎鎿嶄綔">
       <button type="button" onClick={onNewCanvas} title="新建画布">
         <Grid3X3 aria-hidden="true" size={16} />
       </button>
-      <button type="button" onClick={onOpenSettings} title="设置">
+      <button type="button" onClick={onOpenSettings} title="璁剧疆">
         <Settings aria-hidden="true" size={16} />
       </button>
     </div>

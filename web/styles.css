@@ -1738,11 +1738,118 @@ button {
   letter-spacing: 0;
 }
 
+.studio-app-shell .studio-sidebar {
+  width: 80px;
+  flex: 0 0 80px;
+  min-width: 80px;
+  padding: 40px 0 20px;
+  align-items: center;
+  gap: 38px;
+  background: #0b111a;
+  transition: width 220ms ease, flex-basis 220ms ease;
+}
+
+.studio-app-shell .studio-sidebar:hover {
+  width: 220px;
+  flex-basis: 220px;
+}
+
+.studio-app-shell .studio-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+}
+
+.studio-app-shell .studio-nav {
+  width: 100%;
+  gap: 20px;
+}
+
+.studio-app-shell .studio-nav-item {
+  width: 48px;
+  height: 48px;
+  margin-left: 16px;
+  padding: 0 0 0 14px;
+  justify-content: flex-start;
+  gap: 22px;
+  border-radius: 999px;
+  transition: width 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.studio-app-shell .studio-sidebar:hover .studio-nav-item {
+  width: 188px;
+}
+
+.studio-app-shell .studio-nav-item span,
+.studio-app-shell .studio-side-actions button span {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 180ms ease, opacity 160ms ease;
+}
+
+.studio-app-shell .studio-sidebar:hover .studio-nav-item span,
+.studio-app-shell .studio-sidebar:hover .studio-side-actions button span {
+  max-width: 138px;
+  opacity: 1;
+}
+
+.studio-app-shell .studio-nav-item span {
+  color: #9fb0cf;
+  font-size: 22px;
+  font-weight: 850;
+}
+
+.studio-app-shell .studio-nav-item.is-active,
+.studio-app-shell .studio-side-actions button.is-active {
+  color: #0b111a;
+  background: #edf2fa;
+}
+
+.studio-app-shell .studio-side-actions {
+  width: 100%;
+  gap: 12px;
+  align-items: center;
+}
+
+.studio-app-shell .studio-side-actions button {
+  width: 44px;
+  min-height: 40px;
+  padding: 0 13px;
+  justify-content: flex-start;
+  gap: 12px;
+  border-radius: 999px;
+  font-size: 0;
+  transition: width 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.studio-app-shell .studio-sidebar:hover .studio-side-actions button {
+  width: 172px;
+}
+
+.studio-app-shell .studio-side-actions button span {
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.studio-app-shell .studio-side-actions button:nth-child(3),
+.studio-app-shell .studio-side-actions button:nth-child(3) span,
+.studio-app-shell .studio-side-actions button.is-active span {
+  color: #0b111a;
+}
+
+.studio-app-shell .studio-author {
+  width: 100%;
+  text-align: center;
+}
+
 .studio-stage {
   position: relative;
   min-width: 0;
   flex: 1;
-  margin: 8px 8px 8px 18px;
+  margin: 8px 8px 8px 14px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 32px;
@@ -1754,6 +1861,102 @@ button {
   inset: 0;
   overflow: hidden;
   background: #0f141d;
+}
+
+.studio-page-frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #0f141d;
+}
+
+.studio-api-feature {
+  background-image: linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.studio-feature-panel,
+.studio-api-page > .panel {
+  width: min(620px, calc(100vw - 260px));
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: rgba(23, 29, 41, 0.94);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.26);
+}
+
+.studio-feature-panel {
+  padding: 30px;
+}
+
+.studio-feature-kicker {
+  display: block;
+  color: #8ea3c4;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.studio-feature-panel h1 {
+  margin: 10px 0 8px;
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.studio-feature-panel p {
+  max-width: 480px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.studio-feature-flow {
+  margin: 26px 0 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.studio-feature-flow span {
+  min-height: 52px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: #c9d3e4;
+  background: #101722;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.studio-feature-primary {
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 13px;
+  color: #0b111a;
+  background: #edf2fa;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.studio-api-page {
+  overflow: auto;
+  place-items: start center;
+}
+
+.studio-api-page > .panel {
+  padding: 26px;
 }
 
 .canvas-gate {
