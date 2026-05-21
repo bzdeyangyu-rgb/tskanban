@@ -356,6 +356,37 @@ export function App() {
     return () => window.clearInterval(interval);
   }, [editor]);
 
+  useEffect(() => {
+    if (!editor || !isCanvasOpen || activePage !== "canvas") {
+      return undefined;
+    }
+
+    const handleDeleteKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      if (event.key !== "Delete" && event.key !== "Backspace") {
+        return;
+      }
+
+      const selectedIds = editor.getSelectedShapeIds();
+      if (selectedIds.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      const deleteShapes = (editor as unknown as { deleteShapes?: (ids: unknown[]) => void }).deleteShapes;
+      if (typeof deleteShapes === "function") {
+        deleteShapes.call(editor, selectedIds);
+        setStatus(`已删除 ${selectedIds.length} 个对象`);
+      }
+    };
+
+    window.addEventListener("keydown", handleDeleteKey);
+    return () => window.removeEventListener("keydown", handleDeleteKey);
+  }, [activePage, editor, isCanvasOpen]);
+
   const persistCanvasItems = useCallback((items: CanvasGateItem[]) => {
     setCanvasItems(items);
     window.localStorage.setItem(CANVAS_LIST_KEY, JSON.stringify(items));
