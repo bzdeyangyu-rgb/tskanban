@@ -163,7 +163,7 @@ const quickApiNodeType: Record<ApiPageKind, CanvasNodeKind> = {
   klein: "api_inpaint",
   angle: "api_img2img",
   online: "api_text2img",
-  "gpt-chat": "llm"
+  "gpt-chat": "prompt"
 };
 
 const apiPageControls: Record<
@@ -325,6 +325,68 @@ export function App() {
     window.addEventListener("tshuabu:link-drag-start", handleLinkDragStart);
     return () => window.removeEventListener("tshuabu:link-drag-start", handleLinkDragStart);
   }, [editor]);
+
+  useEffect(() => {
+    const handleNodeDataChange = (event: Event) => {
+      if (!editor) {
+        return;
+      }
+      const detail = (event as CustomEvent).detail as { nodeId?: string; patch?: Record<string, unknown> };
+      if (!detail.nodeId || !detail.patch) {
+        return;
+      }
+      const shape = editor.getShape(detail.nodeId as never);
+      if (!shape || !isTshuabuNodeMeta(shape.meta)) {
+        return;
+      }
+      editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        meta: mergeNodeData(shape.meta, detail.patch)
+      });
+    };
+
+    const handleImageNodeFiles = async (event: Event) => {
+      if (!editor) {
+        return;
+      }
+      const detail = (event as CustomEvent).detail as { nodeId?: string; files?: File[] };
+      const file = detail.files?.[0];
+      if (!detail.nodeId || !file) {
+        return;
+      }
+      const shape = editor.getShape(detail.nodeId as never);
+      if (!shape || !isTshuabuNodeMeta(shape.meta)) {
+        return;
+      }
+      try {
+        setStatus(`正在导入 ${file.name}`);
+        const uploaded = await uploadImage(file, session?.sessionId);
+        setSession(await fetchSession(uploaded.sessionId));
+        editor.updateShape({
+          id: shape.id,
+          type: shape.type,
+          meta: mergeNodeData(shape.meta, {
+            assetId: uploaded.asset.assetId,
+            url: uploaded.asset.publicUrl,
+            name: file.name,
+            mime: uploaded.asset.mime,
+            roleTag: "素材"
+          })
+        });
+        setStatus(`已导入到图片节点：${file.name}`);
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    };
+
+    window.addEventListener("tshuabu:node-data-change", handleNodeDataChange);
+    window.addEventListener("tshuabu:image-node-files", handleImageNodeFiles);
+    return () => {
+      window.removeEventListener("tshuabu:node-data-change", handleNodeDataChange);
+      window.removeEventListener("tshuabu:image-node-files", handleImageNodeFiles);
+    };
+  }, [editor, session?.sessionId]);
 
   useEffect(() => {
     if (!editor) {
@@ -1146,7 +1208,6 @@ function CanvasEditorTopbar({
         <ToolbarButton title="图片" label="图片" icon={ImagePlus} onClick={() => onAddNode("image")} />
         <ToolbarButton title="提示词" label="提示词" icon={TextCursorInput} onClick={() => onAddNode("prompt")} />
         <ToolbarButton title="循环" label="循环" icon={Repeat2} onClick={() => onAddNode("loop")} />
-        <ToolbarButton title="LLM" label="LLM" icon={MessageSquareText} onClick={() => onAddNode("llm")} />
         <ToolbarButton title="API生成" label="API生成" icon={WandSparkles} onClick={() => onAddNode("api_text2img")} />
         <ToolbarButton title="MS生成" label="MS生成" icon={CloudLightning} onClick={() => onAddNode("api_img2img")} />
         <ToolbarButton title="视频生成" label="视频生成" icon={Clapperboard} onClick={() => onAddNode("video")} />
@@ -1344,13 +1405,12 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
     return [
       { type: "image", label: "图片节点", icon: Image },
       { type: "prompt", label: "提示词", icon: MessageSquare },
-      { type: "llm", label: "LLM", icon: MessageSquareText }
+      { type: "prompt", label: "提示词", icon: MessageSquareText }
     ];
   }
 
   return [
     { type: "loop", label: "循环", icon: Repeat2 },
-    { type: "llm", label: "LLM", icon: MessageSquareText },
     { type: "api_text2img", label: "文生图", icon: Zap },
     { type: "api_img2img", label: "图生图", icon: Image },
     { type: "api_inpaint", label: "局部重绘", icon: Edit3 },
@@ -1502,8 +1562,6 @@ function nodeDefinition(type: CanvasNodeKind, providerId?: string) {
       };
     case "loop":
       return { type, title: "循环", data: { count: 4, prompt: "批量变化提示词" }, width: 300, height: 170 };
-    case "llm":
-      return { type, title: "LLM", data: { ...providerData, model: "", prompt: "整理提示词或生成创意方向" }, width: 320, height: 190 };
     case "comfy":
       return { type, title: "ComfyUI", data: { workflow: "", note: "当前按参考入口保留" }, width: 340, height: 210 };
     case "video":

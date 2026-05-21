@@ -1136,6 +1136,95 @@ button {
 
 .tshuabu-node-body {
   padding: 12px;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.tshuabu-node-body::-webkit-scrollbar,
+.tshuabu-node-body textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.tshuabu-node-body * {
+  box-sizing: border-box;
+}
+
+.tshuabu-node-body input,
+.tshuabu-node-body textarea,
+.tshuabu-node-body select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--soft);
+  outline: none;
+  font: inherit;
+}
+
+.tshuabu-node-body input,
+.tshuabu-node-body select {
+  height: 30px;
+  padding: 0 9px;
+}
+
+.tshuabu-node-body textarea {
+  min-height: 62px;
+  resize: none;
+  padding: 9px;
+  line-height: 1.45;
+  scrollbar-width: none;
+}
+
+.node-editor-body {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.node-editor-body label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.image-dropzone {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.image-dropzone input[type="file"] {
+  display: none;
+}
+
+.node-char-count {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.api-node-form textarea {
+  min-height: 54px;
+}
+
+.loop-editor textarea {
+  min-height: 74px;
+}
+
+.tshuabu-node-resize-cue {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0.72;
+  background:
+    linear-gradient(135deg, transparent 0 46%, var(--muted) 47% 54%, transparent 55%),
+    linear-gradient(135deg, transparent 0 66%, var(--muted) 67% 74%, transparent 75%);
 }
 
 .node-thumb,
