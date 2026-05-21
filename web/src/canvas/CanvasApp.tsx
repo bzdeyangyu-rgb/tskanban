@@ -35,7 +35,7 @@ export function CanvasApp({
         }
       }}
     >
-      <Tldraw persistenceKey="tshuabu-phase-one-canvas" shapeUtils={shapeUtils} onMount={onMount} />
+      <Tldraw persistenceKey="tshuabu-phase-one-canvas" shapeUtils={shapeUtils} hideUi onMount={onMount} />
     </div>
   );
 }

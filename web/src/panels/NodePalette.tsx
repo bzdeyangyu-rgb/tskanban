@@ -2,13 +2,13 @@ import { ArrowRight, Braces, Clapperboard, Image, MessageSquareText, Paintbrush,
 import type { CanvasNodeKind } from "../canvas/flowTypes";
 
 const nodeButtons = [
-  { label: "图片节点", type: "image", icon: Image },
-  { label: "Prompt 节点", type: "prompt", icon: MessageSquareText },
-  { label: "文生图 API", type: "api_text2img", icon: WandSparkles },
-  { label: "图生图 API", type: "api_img2img", icon: Paintbrush },
-  { label: "局部重绘 API", type: "api_inpaint", icon: ScanLine },
-  { label: "视频 API", type: "video", icon: Clapperboard },
-  { label: "Output 节点", type: "output", icon: Braces }
+  { label: "图片", type: "image", icon: Image },
+  { label: "提示词", type: "prompt", icon: MessageSquareText },
+  { label: "文生图", type: "api_text2img", icon: WandSparkles },
+  { label: "图生图", type: "api_img2img", icon: Paintbrush },
+  { label: "局部重绘", type: "api_inpaint", icon: ScanLine },
+  { label: "视频", type: "video", icon: Clapperboard },
+  { label: "输出", type: "output", icon: Braces }
 ] satisfies Array<{ label: string; type: CanvasNodeKind; icon: typeof Image }>;
 
 export function NodePalette({
@@ -21,18 +21,22 @@ export function NodePalette({
   onConnectMode: () => void;
 }) {
   return (
-    <nav className="panel-stack">
-      <h2 className="panel-heading">节点</h2>
-      {nodeButtons.map(({ label, type, icon: Icon }) => (
-        <button className="node-button" type="button" key={label} disabled={disabled} onClick={() => onAddNode(type)}>
-          <Icon aria-hidden="true" />
-          <span>{label}</span>
+    <nav className="panel-stack node-library">
+      <div className="panel-title-row">
+        <h2 className="panel-heading">节点</h2>
+        <button className="mini-button tool-pill" type="button" disabled={disabled} onClick={onConnectMode}>
+          <ArrowRight aria-hidden="true" />
+          <span>连接</span>
         </button>
-      ))}
-      <button className="node-button connect-button" type="button" disabled={disabled} onClick={onConnectMode}>
-        <ArrowRight aria-hidden="true" />
-        <span>连接箭头</span>
-      </button>
+      </div>
+      <div className="node-button-grid">
+        {nodeButtons.map(({ label, type, icon: Icon }) => (
+          <button className="node-button" type="button" key={label} disabled={disabled} onClick={() => onAddNode(type)}>
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }

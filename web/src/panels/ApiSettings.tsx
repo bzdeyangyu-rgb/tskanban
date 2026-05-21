@@ -92,7 +92,7 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
   };
 
   return (
-    <section className="api-settings">
+    <section className="api-settings compact-card">
       <div className="api-settings-head">
         <h2 className="panel-heading">API 设置</h2>
         <button className="mini-button" type="button" onClick={handleNew}>
@@ -166,7 +166,7 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
         <span>image {draft.imageModels.length}</span>
         <span>chat {draft.chatModels.length}</span>
         <span>video {draft.videoModels.length}</span>
-        <span>共 {modelCount}</span>
+        <span>合计 {modelCount}</span>
       </div>
       {status ? <p className="muted compact">{status}</p> : null}
     </section>

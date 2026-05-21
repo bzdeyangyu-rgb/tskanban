@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
+import { Download, FolderOpen, Play, Save, SlidersHorizontal } from "lucide-react";
 import {
   executeCanvasFlow,
   fetchProviders,
@@ -295,17 +296,42 @@ export function App() {
   );
 
   return (
-    <main className="app-shell visual-shell">
-      <aside className="floating-panel left-material-panel" aria-label="素材面板">
-        <AssetImportPanel disabled={!editor} onFiles={handleImportFiles} />
-        <NodePalette disabled={!editor} onAddNode={handleAddNode} onConnectMode={handleConnectMode} />
-      </aside>
+    <main className="app-shell visual-shell shell">
+      <div className="board-skin" aria-hidden="true" />
+      <div className="topbar">
+        <aside className="panel library left-material-panel" aria-label="素材面板">
+          <AssetImportPanel disabled={!editor} onFiles={handleImportFiles} />
+          <NodePalette disabled={!editor} onAddNode={handleAddNode} onConnectMode={handleConnectMode} />
+        </aside>
+        <div className="panel canvas-nav" aria-label="当前画布">
+          <span className="canvas-preview-mark">
+            <SlidersHorizontal aria-hidden="true" size={16} />
+          </span>
+          <div className="canvas-nav-meta">
+            <strong className="current-canvas-title">Tshuabu 画布</strong>
+            <small className="current-canvas-time">{savedAt ? `已保存 ${savedAt}` : "本地工作流"}</small>
+          </div>
+        </div>
+        <div className="panel toolbar top-toolbar" aria-label="画布操作">
+          <button className="tool-btn" type="button" onClick={handleRun} disabled={!editor} title="运行">
+            <Play aria-hidden="true" size={16} />
+          </button>
+          <button className="tool-btn" type="button" onClick={handleSaveCanvas} disabled={!editor} title="保存">
+            <Save aria-hidden="true" size={16} />
+          </button>
+          <button className="tool-btn" type="button" onClick={handleLoadCanvas} disabled={!editor} title="读取">
+            <FolderOpen aria-hidden="true" size={16} />
+          </button>
+          <button className="tool-btn" type="button" onClick={handleExportSelected} disabled={!editor} title="导出">
+            <Download aria-hidden="true" size={16} />
+          </button>
+        </div>
+      </div>
       <section className="workspace" aria-label="画布">
-        <div className="project-pill">Tshuabu 画布</div>
         <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
         <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
       </section>
-      <aside className="floating-panel right-control-panel" aria-label="控制面板">
+      <aside className="panel right-control-panel" aria-label="控制面板">
         <ApiSettings providers={providers} onProvidersChange={setProviders} />
         <Inspector
           providers={providers}

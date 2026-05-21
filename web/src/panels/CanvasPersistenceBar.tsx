@@ -12,7 +12,7 @@ export function CanvasPersistenceBar({
   onSave: () => void;
 }) {
   return (
-    <section className="persistence-panel">
+    <section className="persistence-panel compact-card">
       <h2 className="panel-heading">画布</h2>
       <div className="history-kv">
         <span>ID</span>
@@ -20,13 +20,13 @@ export function CanvasPersistenceBar({
       </div>
       <div className="persistence-actions">
         <button className="mini-button dark" onClick={onSave} type="button">
-          保存画布
+          保存
         </button>
         <button className="mini-button" onClick={onLoad} type="button">
-          读取画布
+          读取
         </button>
         <button className="mini-button" onClick={onExport} type="button">
-          导出选中结果
+          导出
         </button>
       </div>
       {savedAt ? <p className="muted compact">最近保存：{savedAt}</p> : <p className="muted compact">尚未保存</p>}

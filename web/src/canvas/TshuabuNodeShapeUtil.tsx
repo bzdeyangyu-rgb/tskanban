@@ -38,7 +38,7 @@ export class TshuabuNodeShapeUtil extends BaseBoxShapeUtil<TshuabuNodeShape> {
   }
 
   override indicator(shape: TshuabuNodeShape) {
-    return <rect width={shape.props.w} height={shape.props.h} rx={8} ry={8} />;
+    return <rect width={shape.props.w} height={shape.props.h} rx={22} ry={22} />;
   }
 }
 
@@ -80,7 +80,9 @@ function NodeBody({
   return (
     <div className="tshuabu-node-body api-preview">
       <span>{stringValue(data.model) || "选择模型"}</span>
-      <small>{status === "failed" ? stringValue(data.errorMessage) || "执行失败" : stringValue(data.prompt) || "连接 Prompt 或填写覆盖提示词"}</small>
+      <small>
+        {status === "failed" ? stringValue(data.errorMessage) || "执行失败" : stringValue(data.prompt) || "连接 Prompt 或填写覆盖提示词"}
+      </small>
     </div>
   );
 }

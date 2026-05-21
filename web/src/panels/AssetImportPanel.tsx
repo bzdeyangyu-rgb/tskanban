@@ -8,14 +8,15 @@ export function AssetImportPanel({
   onFiles: (files: File[]) => void;
 }) {
   return (
-    <section className="asset-import-panel">
+    <section className="asset-import-panel library-section">
       <div className="panel-title-row">
-        <h2 className="panel-heading">本地素材</h2>
+        <h2 className="panel-heading">素材库</h2>
+        <span className="panel-chip">本地</span>
       </div>
       <label className={`asset-import-drop ${disabled ? "disabled" : ""}`}>
         <Upload aria-hidden="true" />
-        <span>选择图片</span>
-        <small>支持 jpg / png，也可以拖拽或粘贴到画布</small>
+        <span>导入图片</span>
+        <small>支持 jpg / png，可拖入或粘贴到画布</small>
         <input
           accept="image/png,image/jpeg"
           disabled={disabled}

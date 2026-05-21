@@ -16,12 +16,12 @@ type InspectorProps = {
 
 export function Inspector({ providers, runNodes, selectedNode, onUpdateSelectedNode }: InspectorProps) {
   return (
-    <section className="panel-stack">
+    <section className="panel-stack compact-card">
       <h2 className="panel-heading">属性</h2>
       {selectedNode ? (
         <NodeEditor providers={providers} selectedNode={selectedNode} onUpdateSelectedNode={onUpdateSelectedNode} />
       ) : (
-        <p className="muted">选中一个节点后，可以在这里编辑运行参数。</p>
+        <p className="muted">选中节点后，可在这里编辑运行参数。</p>
       )}
 
       {runNodes.length > 0 ? (

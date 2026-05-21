@@ -33,7 +33,7 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
     }
 
     let cancelled = false;
-    setTraceStatus("读取来源链");
+    setTraceStatus("读取来源链...");
     fetchAssetProvenance(session.sessionId, selectedAssetId)
       .then((result) => {
         if (!cancelled) {
@@ -60,7 +60,7 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
     }
 
     let cancelled = false;
-    setRagStatus("读取 RAG 日志");
+    setRagStatus("读取 RAG 日志...");
     fetchRagEvents({ sessionId: session.sessionId, assetId: selectedAssetId, limit: 8 })
       .then((events) => {
         if (!cancelled) {
@@ -82,9 +82,9 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
 
   if (!session || !model) {
     return (
-      <section className="history-panel">
+      <section className="history-panel compact-card">
         <h2 className="panel-heading">运行历史</h2>
-        <p className="muted compact">运行一次画布后，这里会显示来源链。</p>
+        <p className="muted compact">运行一次画布后，这里会显示结果、版本和来源链。</p>
       </section>
     );
   }
@@ -92,7 +92,7 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
   const selectedRun = findRunById(model, selectedRunId);
 
   return (
-    <section className="history-panel">
+    <section className="history-panel compact-card">
       <h2 className="panel-heading">运行历史</h2>
       <div className="history-block">
         <div className="history-kv">
@@ -221,7 +221,7 @@ function VersionList({
             <strong>{version.versionId}</strong>
             <span>{version.action}</span>
             <small>
-              {version.sourceNodeId ?? "-"} · {version.providerId ?? "local"}
+              {version.sourceNodeId ?? "-"} / {version.providerId ?? "local"}
             </small>
           </button>
         );
@@ -254,7 +254,7 @@ function TracePanel({
           </div>
           {step.prompt ? <p>{step.prompt}</p> : null}
           <small>
-            {step.action ?? "asset"} · {step.model ?? "-"} · {step.sourceNodeId ?? "-"}
+            {step.action ?? "asset"} / {step.model ?? "-"} / {step.sourceNodeId ?? "-"}
           </small>
           {step.parentAssetIds.length > 0 ? <small>父级 {step.parentAssetIds.join(", ")}</small> : null}
         </div>
@@ -288,7 +288,7 @@ function RagPanel({
           </div>
           <p>{event.prompt}</p>
           <small>
-            {event.model} · {event.flow_id ?? event.session_id}
+            {event.model} / {event.flow_id ?? event.session_id}
           </small>
         </div>
       ))}
