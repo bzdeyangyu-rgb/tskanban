@@ -2,23 +2,36 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import type { Editor } from "tldraw";
 import {
   Box,
+  Braces,
+  CheckCircle2,
+  CircleDot,
+  Clapperboard,
+  CloudLightning,
   Download,
   Edit3,
   FolderOpen,
   Globe2,
   Grid3X3,
+  Group,
   Image,
+  ImagePlus,
   Languages,
   Layers,
   Link,
+  ListTodo,
   MessageSquare,
+  MessageSquareText,
   Play,
   Plus,
   RefreshCw,
+  Repeat2,
   Save,
   Settings,
   Sun,
+  TextCursorInput,
   Trash2,
+  WandSparkles,
+  Workflow,
   X,
   Zap,
   type LucideIcon
@@ -141,6 +154,17 @@ const apiPageCopy: Record<
     description: "\u4fdd\u7559\u53c2\u8003\u9879\u76ee\u7684\u5bf9\u8bdd\u5165\u53e3\uff0c\u7528\u6211\u4eec\u7684 API \u505a\u521b\u610f\u6c9f\u901a\u3001\u63d0\u793a\u8bcd\u6574\u7406\u548c\u6d41\u7a0b\u5efa\u8bae\u3002",
     actions: ["\u4f1a\u8bdd", "\u4e0a\u4e0b\u6587", "\u63d0\u793a\u8bcd\u4f18\u5316", "\u53d1\u9001"]
   }
+};
+
+type ApiPageKind = Exclude<StudioPageId, "canvas" | "api-settings">;
+
+const quickApiNodeType: Record<ApiPageKind, CanvasNodeKind> = {
+  zimage: "api_text2img",
+  enhance: "api_img2img",
+  klein: "api_inpaint",
+  angle: "api_img2img",
+  online: "api_text2img",
+  "gpt-chat": "llm"
 };
 
 export function App() {
@@ -326,6 +350,28 @@ export function App() {
 
     editor.setCurrentTool("arrow");
     setStatus("连接模式：从一个节点拖出连线到另一个节点");
+  }, [editor]);
+
+  const handleGroupSelected = useCallback(() => {
+    if (!editor) {
+      setStatus("画布还在加载");
+      return;
+    }
+
+    const selectedIds = editor.getSelectedShapeIds();
+    if (selectedIds.length < 2) {
+      setStatus("请先选择至少两个图片或提示词节点再分组");
+      return;
+    }
+
+    const groupShapes = (editor as unknown as { groupShapes?: (ids: unknown[]) => void }).groupShapes;
+    if (typeof groupShapes === "function") {
+      groupShapes.call(editor, selectedIds);
+      setStatus(`已分组 ${selectedIds.length} 个节点`);
+      return;
+    }
+
+    setStatus("当前画布内核暂不支持真实分组，后续会换成参考项目的分组模型");
   }, [editor]);
 
   const handleUpdateSelectedNode = useCallback(
@@ -536,12 +582,16 @@ export function App() {
                   <CanvasEditorTopbar
                     savedAt={savedAt}
                     status={status}
+                    onAddNode={handleAddNode}
                     onClose={() => {
                       setIsCanvasOpen(false);
                       setDrawerMode(null);
                     }}
                     onExport={handleExportSelected}
+                    onGroup={handleGroupSelected}
                     onLoad={handleLoadCanvas}
+                    onOpenLog={() => setDrawerMode("history")}
+                    onOpenNodes={() => setDrawerMode("nodes")}
                     onRun={handleRun}
                     onSave={handleSaveCanvas}
                   />
@@ -587,7 +637,7 @@ export function App() {
             <ApiSettings providers={providers} onProvidersChange={setProviders} />
           </section>
         ) : (
-          <StudioApiPage pageId={activePage} />
+          <StudioApiPage pageId={activePage} providers={providers} />
         )}
         <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
       </section>
@@ -650,31 +700,175 @@ function StudioSidebar({
 }
 
 function StudioApiPage({
-  pageId
+  pageId,
+  providers
 }: {
-  pageId: Exclude<StudioPageId, "canvas" | "api-settings">;
+  pageId: ApiPageKind;
+  providers: ApiProvider[];
 }) {
   const page = apiPageCopy[pageId];
+  const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState("");
+  const [outputs, setOutputs] = useState<Array<{ assetId: string; url: string }>>([]);
+  const provider = providers.find((item) => item.primary && item.enabled) ?? providers.find((item) => item.enabled);
+  const model =
+    pageId === "gpt-chat"
+      ? provider?.chatModels[0] ?? ""
+      : quickApiNodeType[pageId] === "video"
+        ? provider?.videoModels[0] ?? ""
+        : provider?.imageModels[0] ?? "gpt-image-2";
+  const needsImage = pageId === "enhance" || pageId === "klein" || pageId === "angle";
+
+  const handleRunQuickTask = async () => {
+    setMessage("");
+    setOutputs([]);
+    if (pageId === "gpt-chat") {
+      setMessage("GPT 对话入口已保留，但当前后端还缺 chat runner；需要补 /api/chat 后才能真正发送。");
+      return;
+    }
+    if (needsImage && !file) {
+      setMessage("请先选择一张图片。");
+      return;
+    }
+    if (!prompt.trim()) {
+      setMessage("请先输入提示词或编辑指令。");
+      return;
+    }
+
+    setRunning(true);
+    try {
+      const sessionSeed = file ? await uploadImage(file) : undefined;
+      const flow = quickApiFlow({
+        pageId,
+        prompt,
+        negativePrompt,
+        providerId: provider?.id,
+        model,
+        assetId: sessionSeed?.asset.assetId,
+        sessionId: sessionSeed?.sessionId
+      });
+      const result = await executeCanvasFlow(flow);
+      setOutputs(result.outputAssets);
+      setMessage(result.run.status === "failed" ? result.run.errorMessage ?? "执行失败" : "任务已完成");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <section className="studio-page-frame studio-api-feature" aria-label={page.title}>
       <div className="studio-feature-panel">
         <span className="studio-feature-kicker">{page.kicker}</span>
         <h1>{page.title}</h1>
         <p>{page.description}</p>
-        <div className="studio-feature-flow" aria-label={`${page.title} API 流程`}>
+        <div className="studio-feature-form">
+          {needsImage ? (
+            <label className="studio-upload-field">
+              <ImagePlus aria-hidden="true" size={18} />
+              <span>{file ? file.name : "选择图片"}</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            </label>
+          ) : null}
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder={pageId === "gpt-chat" ? "输入对话内容" : "输入提示词或编辑指令"}
+          />
+          <input
+            value={negativePrompt}
+            onChange={(event) => setNegativePrompt(event.target.value)}
+            placeholder="负面提示词，可选"
+          />
+        </div>
+        <div className="studio-feature-flow compact" aria-label={`${page.title} API 流程`}>
           {page.actions.map((action, index) => (
             <span key={action}>
               {index + 1}. {action}
             </span>
           ))}
         </div>
-        <button type="button" className="studio-feature-primary">
-          <Plus aria-hidden="true" size={16} />
-          新建任务
+        <button type="button" className="studio-feature-primary" disabled={running} onClick={handleRunQuickTask}>
+          {running ? <RefreshCw aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
+          {running ? "提交中" : "提交 API 任务"}
         </button>
+        {message ? <div className="studio-feature-message">{message}</div> : null}
+        {outputs.length ? (
+          <div className="studio-feature-output">
+            {outputs.map((output) => (
+              <img src={output.url} alt={output.assetId} key={output.assetId} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
+}
+
+function quickApiFlow(input: {
+  pageId: ApiPageKind;
+  prompt: string;
+  negativePrompt: string;
+  providerId?: string;
+  model: string;
+  assetId?: string;
+  sessionId?: string;
+}) {
+  const now = new Date().toISOString();
+  const promptNode = {
+    id: "quick_prompt",
+    type: "prompt" as const,
+    x: 0,
+    y: 0,
+    width: 280,
+    height: 140,
+    data: { text: input.prompt }
+  };
+  const apiNode = {
+    id: "quick_api",
+    type: quickApiNodeType[input.pageId],
+    x: 320,
+    y: 0,
+    width: 300,
+    height: 160,
+    data: {
+      providerId: input.providerId,
+      model: input.model,
+      negativePrompt: input.negativePrompt,
+      baseAssetId: input.assetId,
+      maskAssetId: input.pageId === "klein" ? input.assetId : undefined
+    }
+  };
+  const imageNode = input.assetId
+    ? {
+        id: "quick_image",
+        type: "image" as const,
+        x: 0,
+        y: 180,
+        width: 260,
+        height: 220,
+        data: { assetId: input.assetId }
+      }
+    : undefined;
+
+  return {
+    canvasId: `quick_${input.pageId}_${Date.now().toString(36)}`,
+    sessionId: input.sessionId,
+    nodes: imageNode ? [promptNode, imageNode, apiNode] : [promptNode, apiNode],
+    edges: imageNode
+      ? [
+          { id: "edge_prompt", from: promptNode.id, to: apiNode.id },
+          { id: "edge_image", from: imageNode.id, to: apiNode.id }
+        ]
+      : [{ id: "edge_prompt", from: promptNode.id, to: apiNode.id }],
+    viewport: { x: 0, y: 0, zoom: 1 },
+    createdAt: now,
+    updatedAt: now
+  };
 }
 function CanvasGate({
   items,
@@ -731,17 +925,25 @@ function CanvasGate({
 function CanvasEditorTopbar({
   savedAt,
   status,
+  onAddNode,
   onClose,
   onExport,
+  onGroup,
   onLoad,
+  onOpenLog,
+  onOpenNodes,
   onRun,
   onSave
 }: {
   savedAt: string;
   status: string;
+  onAddNode: (type: CanvasNodeKind) => void;
   onClose: () => void;
   onExport: () => void;
+  onGroup: () => void;
   onLoad: () => void;
+  onOpenLog: () => void;
+  onOpenNodes: () => void;
   onRun: () => void;
   onSave: () => void;
 }) {
@@ -764,6 +966,20 @@ function CanvasEditorTopbar({
         <IconButton title="保存" onClick={onSave} icon={Save} />
         <IconButton title="读取" onClick={onLoad} icon={FolderOpen} />
         <IconButton title="导出" onClick={onExport} icon={Download} />
+      </div>
+      <div className="studio-canvas-toolbar" aria-label="节点工具">
+        <ToolbarButton title="图片" label="图片" icon={ImagePlus} onClick={() => onAddNode("image")} />
+        <ToolbarButton title="提示词" label="提示词" icon={TextCursorInput} onClick={() => onAddNode("prompt")} />
+        <ToolbarButton title="循环" label="循环" icon={Repeat2} onClick={() => onAddNode("loop")} />
+        <ToolbarButton title="LLM" label="LLM" icon={MessageSquareText} onClick={() => onAddNode("llm")} />
+        <ToolbarButton title="API生成" label="API生成" icon={WandSparkles} onClick={() => onAddNode("api_text2img")} />
+        <ToolbarButton title="MS生成" label="MS生成" icon={CloudLightning} onClick={() => onAddNode("api_img2img")} />
+        <ToolbarButton title="视频生成" label="视频生成" icon={Clapperboard} onClick={() => onAddNode("video")} />
+        <ToolbarButton title="ComfyUI" label="ComfyUI" icon={Workflow} onClick={() => onAddNode("comfy")} />
+        <ToolbarButton title="Output" label="Output" icon={CircleDot} onClick={() => onAddNode("output")} />
+        <ToolbarButton title="分组" label="分组" icon={Group} onClick={onGroup} />
+        <ToolbarButton title="节点面板" label="节点" icon={Braces} onClick={onOpenNodes} />
+        <ToolbarButton title="日志" label="日志" icon={ListTodo} onClick={onOpenLog} />
       </div>
     </header>
   );
@@ -919,22 +1135,51 @@ function IconButton({ icon: Icon, onClick, title }: { icon: LucideIcon; onClick:
   );
 }
 
+function ToolbarButton({
+  icon: Icon,
+  label,
+  onClick,
+  title
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button className="tool-btn canvas-tool-btn" type="button" onClick={onClick} title={title}>
+      <Icon aria-hidden="true" size={16} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
-  if (nodeType === "api_text2img" || nodeType === "api_img2img" || nodeType === "api_inpaint" || nodeType === "video") {
+  if (
+    nodeType === "api_text2img" ||
+    nodeType === "api_img2img" ||
+    nodeType === "api_inpaint" ||
+    nodeType === "video" ||
+    nodeType === "comfy"
+  ) {
     return [{ type: "output", label: "Output", icon: Layers }];
   }
 
   if (nodeType === "output") {
     return [
       { type: "image", label: "图片节点", icon: Image },
-      { type: "prompt", label: "提示词", icon: MessageSquare }
+      { type: "prompt", label: "提示词", icon: MessageSquare },
+      { type: "llm", label: "LLM", icon: MessageSquareText }
     ];
   }
 
   return [
+    { type: "loop", label: "循环", icon: Repeat2 },
+    { type: "llm", label: "LLM", icon: MessageSquareText },
     { type: "api_text2img", label: "文生图", icon: Zap },
     { type: "api_img2img", label: "图生图", icon: Image },
     { type: "api_inpaint", label: "局部重绘", icon: Edit3 },
+    { type: "comfy", label: "ComfyUI", icon: Workflow },
     { type: "video", label: "视频生成", icon: Play },
     { type: "output", label: "Output", icon: Layers }
   ];
@@ -1080,6 +1325,12 @@ function nodeDefinition(type: CanvasNodeKind, providerId?: string) {
         width: 260,
         height: 150
       };
+    case "loop":
+      return { type, title: "循环", data: { count: 4, prompt: "批量变化提示词" }, width: 300, height: 170 };
+    case "llm":
+      return { type, title: "LLM", data: { ...providerData, model: "", prompt: "整理提示词或生成创意方向" }, width: 320, height: 190 };
+    case "comfy":
+      return { type, title: "ComfyUI", data: { workflow: "", note: "当前按参考入口保留" }, width: 340, height: 210 };
     case "video":
       return { type, title: "视频 API", data: { ...providerData, model: "" }, width: 260, height: 150 };
     case "output":

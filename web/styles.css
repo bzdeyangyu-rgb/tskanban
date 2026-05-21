@@ -1797,8 +1797,8 @@ button {
 
 .studio-app-shell .studio-nav-item span {
   color: #9fb0cf;
-  font-size: 22px;
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .studio-app-shell .studio-nav-item.is-active,
@@ -1830,8 +1830,8 @@ button {
 
 .studio-app-shell .studio-side-actions button span {
   display: inline-block;
-  font-size: 16px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .studio-app-shell .studio-side-actions button:nth-child(3),
@@ -1915,6 +1915,54 @@ button {
   line-height: 1.7;
 }
 
+.studio-feature-form {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.studio-feature-form textarea,
+.studio-feature-form input:not([type="file"]) {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  background: #101722;
+  outline: none;
+  font: inherit;
+}
+
+.studio-feature-form textarea {
+  min-height: 128px;
+  padding: 14px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.studio-feature-form input:not([type="file"]) {
+  height: 42px;
+  padding: 0 14px;
+}
+
+.studio-upload-field {
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: #c9d3e4;
+  background: #101722;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.studio-upload-field input {
+  display: none;
+}
+
 .studio-feature-flow {
   margin: 26px 0 22px;
   display: grid;
@@ -1935,6 +1983,10 @@ button {
   font-weight: 800;
 }
 
+.studio-feature-flow.compact {
+  margin-top: 14px;
+}
+
 .studio-feature-primary {
   height: 40px;
   padding: 0 16px;
@@ -1948,6 +2000,37 @@ button {
   font-size: 13px;
   font-weight: 850;
   cursor: pointer;
+}
+
+.studio-feature-primary:disabled {
+  opacity: 0.62;
+  cursor: wait;
+}
+
+.studio-feature-message {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  color: #c9d3e4;
+  background: #101722;
+  font-size: 12px;
+}
+
+.studio-feature-output {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.studio-feature-output img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #0b111a;
 }
 
 .studio-api-page {
@@ -2176,6 +2259,43 @@ button {
   height: 36px;
   border-radius: 13px;
   background: #101722;
+}
+
+.studio-canvas-toolbar {
+  position: absolute;
+  top: 70px;
+  right: 0;
+  max-width: min(980px, calc(100vw - 180px));
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(17, 23, 34, 0.86);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.studio-canvas-toolbar .canvas-tool-btn {
+  width: auto;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 999px;
+  background: #101722;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.studio-canvas-toolbar .canvas-tool-btn span {
+  white-space: nowrap;
 }
 
 .studio-workspace {
