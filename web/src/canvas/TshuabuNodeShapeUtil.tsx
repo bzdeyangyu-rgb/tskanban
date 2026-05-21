@@ -34,7 +34,25 @@ export class TshuabuNodeShapeUtil extends BaseBoxShapeUtil<TshuabuNodeShape> {
           <strong>{statusLabel(status)}</strong>
         </div>
         <NodeBody data={meta.data} nodeId={String(shape.id)} nodeType={meta.nodeType} status={status} />
-        <span className="tshuabu-node-resize-cue" aria-hidden="true" />
+        <button
+          className="tshuabu-node-resize-handle"
+          type="button"
+          aria-label="调整节点大小"
+          title="调整节点大小"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent("tshuabu:node-resize-start", {
+                detail: {
+                  shapeId: shape.id,
+                  clientX: event.clientX,
+                  clientY: event.clientY
+                }
+              })
+            );
+          }}
+        />
         <button
           className="tshuabu-node-port out"
           type="button"
@@ -78,19 +96,23 @@ function NodeBody({
   if (nodeType === "image") {
     const url = stringValue(data.url);
     return (
-      <label
+      <div
         className={`tshuabu-node-body image-dropzone ${url ? "has-image" : ""}`}
         onDrop={(event) => handleImageDrop(event, nodeId)}
         onDragOver={(event) => event.preventDefault()}
         onPointerDown={stopNodeControl}
+        onClick={(event) => event.stopPropagation()}
       >
         {url ? <img alt={stringValue(data.name) || "素材"} className="node-thumb" src={url} /> : <div className="node-empty">点击或拖入图片</div>}
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp"
+          aria-label="导入图片"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={stopNodeControl}
           onChange={(event) => dispatchNodeFiles(nodeId, event.target.files)}
         />
-      </label>
+      </div>
     );
   }
 

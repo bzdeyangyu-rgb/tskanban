@@ -389,6 +389,59 @@ export function App() {
   }, [editor, session?.sessionId]);
 
   useEffect(() => {
+    const handleResizeStart = (event: Event) => {
+      if (!editor) {
+        return;
+      }
+      const detail = (event as CustomEvent).detail as { shapeId?: string; clientX?: number; clientY?: number };
+      if (!detail.shapeId || typeof detail.clientX !== "number" || typeof detail.clientY !== "number") {
+        return;
+      }
+      const shape = editor.getShape(detail.shapeId as never);
+      if (!shape || shape.type !== "tshuabu-node") {
+        return;
+      }
+
+      const start = {
+        clientX: detail.clientX,
+        clientY: detail.clientY,
+        x: shape.x,
+        w: typeof shape.props.w === "number" ? shape.props.w : 280,
+        h: typeof shape.props.h === "number" ? shape.props.h : 180,
+        z: editor.getCamera().z || 1
+      };
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        const dx = (moveEvent.clientX - start.clientX) / start.z;
+        const dy = (moveEvent.clientY - start.clientY) / start.z;
+        const nextW = Math.max(220, start.w - dx);
+        const nextH = Math.max(120, start.h + dy);
+        editor.updateShape({
+          id: shape.id,
+          type: shape.type,
+          x: start.x + (start.w - nextW),
+          props: {
+            ...shape.props,
+            w: nextW,
+            h: nextH
+          }
+        });
+      };
+
+      const handleUp = () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+      };
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp, { once: true });
+    };
+
+    window.addEventListener("tshuabu:node-resize-start", handleResizeStart);
+    return () => window.removeEventListener("tshuabu:node-resize-start", handleResizeStart);
+  }, [editor]);
+
+  useEffect(() => {
     if (!editor) {
       setSelectedNode(null);
       return undefined;
