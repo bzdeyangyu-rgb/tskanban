@@ -108,7 +108,7 @@ export function connectNodes(editor: Editor, fromId: string, toId: string): stri
     props: {
       kind: "arc",
       labelColor: "black",
-      color: "black",
+      color: "white",
       fill: "none",
       dash: "solid",
       size: "m",

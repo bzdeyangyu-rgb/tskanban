@@ -3,7 +3,6 @@ import type { Editor } from "tldraw";
 import {
   Box,
   Braces,
-  CheckCircle2,
   CircleDot,
   Clapperboard,
   CloudLightning,
@@ -26,6 +25,7 @@ import {
   RefreshCw,
   Repeat2,
   Save,
+  SlidersHorizontal,
   Settings,
   Sun,
   TextCursorInput,
@@ -68,7 +68,6 @@ import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
-import { RunPanel } from "./panels/RunPanel";
 import { RunHistory } from "./panels/RunHistory";
 
 type SelectedNode = {
@@ -167,6 +166,81 @@ const quickApiNodeType: Record<ApiPageKind, CanvasNodeKind> = {
   "gpt-chat": "llm"
 };
 
+const apiPageControls: Record<
+  ApiPageKind,
+  {
+    uploadLabel?: string;
+    promptLabel: string;
+    previewTitle: string;
+    managementTitle: string;
+    fields: Array<{ key: string; label: string; type: "text" | "select" | "range" | "number"; options?: string[]; defaultValue: string }>;
+  }
+> = {
+  zimage: {
+    promptLabel: "输入提示词",
+    previewTitle: "生成预览",
+    managementTitle: "批量管理 / 版本管理",
+    fields: [
+      { key: "size", label: "尺寸", type: "select", options: ["1024x1024", "1024x1536", "1536x1024", "768x1344"], defaultValue: "1024x1024" },
+      { key: "batch", label: "批量", type: "number", defaultValue: "1" },
+      { key: "style", label: "风格", type: "text", defaultValue: "" }
+    ]
+  },
+  enhance: {
+    uploadLabel: "输入图片",
+    promptLabel: "增强说明",
+    previewTitle: "画布预览",
+    managementTitle: "增强记录管理",
+    fields: [
+      { key: "strength", label: "增强程度", type: "range", defaultValue: "60" },
+      { key: "scale", label: "放大倍率", type: "select", options: ["1x", "2x", "4x"], defaultValue: "2x" },
+      { key: "detail", label: "细节保真", type: "range", defaultValue: "70" }
+    ]
+  },
+  klein: {
+    uploadLabel: "参考图片",
+    promptLabel: "输入提示词",
+    previewTitle: "编辑预览",
+    managementTitle: "图片编辑管理",
+    fields: [
+      { key: "mask", label: "蒙版模式", type: "select", options: ["自动识别", "手动蒙版", "全图编辑"], defaultValue: "自动识别" },
+      { key: "strength", label: "编辑强度", type: "range", defaultValue: "55" },
+      { key: "reference", label: "参考权重", type: "range", defaultValue: "65" }
+    ]
+  },
+  angle: {
+    uploadLabel: "输入图片",
+    promptLabel: "角度说明",
+    previewTitle: "结果预览",
+    managementTitle: "角度版本管理",
+    fields: [
+      { key: "camera", label: "相机控制", type: "select", options: ["正面", "左 45°", "右 45°", "俯视", "低角度"], defaultValue: "左 45°" },
+      { key: "focal", label: "焦距", type: "select", options: ["24mm", "35mm", "50mm", "85mm"], defaultValue: "35mm" },
+      { key: "strength", label: "参数强度", type: "range", defaultValue: "50" }
+    ]
+  },
+  online: {
+    promptLabel: "在线提示词",
+    previewTitle: "在线结果",
+    managementTitle: "在线任务管理",
+    fields: [
+      { key: "source", label: "平台", type: "select", options: ["API Provider", "ModelScope", "远程队列"], defaultValue: "API Provider" },
+      { key: "size", label: "尺寸", type: "select", options: ["1024x1024", "1024x1536", "1536x1024"], defaultValue: "1024x1024" },
+      { key: "batch", label: "批量", type: "number", defaultValue: "1" }
+    ]
+  },
+  "gpt-chat": {
+    promptLabel: "对话输入",
+    previewTitle: "回复预览",
+    managementTitle: "会话管理",
+    fields: [
+      { key: "mode", label: "模式", type: "select", options: ["提示词优化", "创意讨论", "流程建议"], defaultValue: "提示词优化" },
+      { key: "context", label: "上下文", type: "text", defaultValue: "" },
+      { key: "temperature", label: "发散程度", type: "range", defaultValue: "50" }
+    ]
+  }
+};
+
 export function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [status, setStatus] = useState("等待画布输入");
@@ -178,6 +252,8 @@ export function App() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [activePage, setActivePage] = useState<StudioPageId>("canvas");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [language, setLanguage] = useState<"zh" | "en">("zh");
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
   const placementIndexRef = useRef(0);
@@ -191,6 +267,10 @@ export function App() {
     return next;
   }, []);
   const [canvasItems, setCanvasItems] = useState<CanvasGateItem[]>(() => readCanvasGateItems(canvasId));
+
+  useEffect(() => {
+    document.documentElement.dataset.studioTheme = theme;
+  }, [theme]);
 
   useEffect(() => {
     fetchProviders()
@@ -556,11 +636,15 @@ export function App() {
     <main className="studio-app-shell">
       <StudioSidebar
         activePage={activePage}
+        language={language}
+        theme={theme}
+        onLanguageToggle={() => setLanguage((current) => (current === "zh" ? "en" : "zh"))}
         onSwitch={(page) => {
           setActivePage(page);
           setDrawerMode(null);
           setLinkCommandMenu(null);
         }}
+        onThemeToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
       />
       <section
         className={`studio-stage ${activePage === "canvas" && isCanvasOpen ? "is-editor" : "is-gate"}`}
@@ -597,7 +681,6 @@ export function App() {
                   />
                   <section className="workspace studio-workspace" aria-label="画布">
                     <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
-                    <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
                   </section>
                 </>
               )}
@@ -647,10 +730,18 @@ export function App() {
 
 function StudioSidebar({
   activePage,
-  onSwitch
+  language,
+  theme,
+  onLanguageToggle,
+  onSwitch,
+  onThemeToggle
 }: {
   activePage: StudioPageId;
+  language: "zh" | "en";
+  theme: "dark" | "light";
+  onLanguageToggle: () => void;
   onSwitch: (page: StudioPageId) => void;
+  onThemeToggle: () => void;
 }) {
   return (
     <aside className="studio-sidebar" aria-label="主导航">
@@ -676,13 +767,13 @@ function StudioSidebar({
         })}
       </nav>
       <div className="studio-side-actions" aria-label="辅助操作">
-        <button type="button" title="黑夜模式">
+        <button type="button" title="黑夜模式" className={theme === "dark" ? "is-active" : ""} onClick={onThemeToggle}>
           <Sun aria-hidden="true" size={16} />
-          <span>黑夜模式</span>
+          <span>{theme === "dark" ? "黑夜模式" : "白天模式"}</span>
         </button>
-        <button type="button" title="中文">
+        <button type="button" title="中文" onClick={onLanguageToggle}>
           <Languages aria-hidden="true" size={16} />
-          <span>中文</span>
+          <span>{language === "zh" ? "中文" : "English"}</span>
         </button>
         <button
           type="button"
@@ -713,6 +804,10 @@ function StudioApiPage({
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("");
   const [outputs, setOutputs] = useState<Array<{ assetId: string; url: string }>>([]);
+  const controls = apiPageControls[pageId];
+  const [controlValues, setControlValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(controls.fields.map((field) => [field.key, field.defaultValue]))
+  );
   const provider = providers.find((item) => item.primary && item.enabled) ?? providers.find((item) => item.enabled);
   const model =
     pageId === "gpt-chat"
@@ -720,7 +815,10 @@ function StudioApiPage({
       : quickApiNodeType[pageId] === "video"
         ? provider?.videoModels[0] ?? ""
         : provider?.imageModels[0] ?? "gpt-image-2";
-  const needsImage = pageId === "enhance" || pageId === "klein" || pageId === "angle";
+  const needsImage = Boolean(controls.uploadLabel);
+  const setControl = (key: string, value: string) => {
+    setControlValues((current) => ({ ...current, [key]: value }));
+  };
 
   const handleRunQuickTask = async () => {
     setMessage("");
@@ -745,6 +843,7 @@ function StudioApiPage({
         pageId,
         prompt,
         negativePrompt,
+        params: controlValues,
         providerId: provider?.id,
         model,
         assetId: sessionSeed?.asset.assetId,
@@ -766,44 +865,93 @@ function StudioApiPage({
         <span className="studio-feature-kicker">{page.kicker}</span>
         <h1>{page.title}</h1>
         <p>{page.description}</p>
-        <div className="studio-feature-form">
-          {needsImage ? (
-            <label className="studio-upload-field">
-              <ImagePlus aria-hidden="true" size={18} />
-              <span>{file ? file.name : "选择图片"}</span>
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+        <div className="studio-feature-grid">
+          <div className="studio-feature-form">
+            {needsImage ? (
+              <label className="studio-upload-field">
+                <ImagePlus aria-hidden="true" size={18} />
+                <span>{file ? file.name : controls.uploadLabel}</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            ) : null}
+            <label className="studio-form-label">
+              {controls.promptLabel}
+              <textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder={pageId === "gpt-chat" ? "输入对话内容" : "输入提示词或编辑指令"}
+              />
             </label>
-          ) : null}
-          <textarea
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder={pageId === "gpt-chat" ? "输入对话内容" : "输入提示词或编辑指令"}
-          />
-          <input
-            value={negativePrompt}
-            onChange={(event) => setNegativePrompt(event.target.value)}
-            placeholder="负面提示词，可选"
-          />
+            <label className="studio-form-label">
+              负面提示词
+              <input
+                value={negativePrompt}
+                onChange={(event) => setNegativePrompt(event.target.value)}
+                placeholder="可选"
+              />
+            </label>
+            <div className="studio-param-grid">
+              {controls.fields.map((field) => (
+                <label className="studio-param-field" key={field.key}>
+                  <span>{field.label}</span>
+                  {field.type === "select" ? (
+                    <select value={controlValues[field.key] ?? field.defaultValue} onChange={(event) => setControl(field.key, event.target.value)}>
+                      {field.options?.map((option) => (
+                        <option value={option} key={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === "range" ? (
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={controlValues[field.key] ?? field.defaultValue}
+                      onChange={(event) => setControl(field.key, event.target.value)}
+                    />
+                  ) : (
+                    <input
+                      type={field.type}
+                      value={controlValues[field.key] ?? field.defaultValue}
+                      onChange={(event) => setControl(field.key, event.target.value)}
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+          <aside className="studio-preview-panel">
+            <header>
+              <strong>{controls.previewTitle}</strong>
+              <span>{model || "未选择模型"}</span>
+            </header>
+            {outputs.length ? (
+              <div className="studio-feature-output">
+                {outputs.map((output) => (
+                  <img src={output.url} alt={output.assetId} key={output.assetId} />
+                ))}
+              </div>
+            ) : (
+              <div className="studio-preview-empty">{file ? file.name : "等待提交任务后显示预览"}</div>
+            )}
+          </aside>
         </div>
-        <div className="studio-feature-flow compact" aria-label={`${page.title} API 流程`}>
-          {page.actions.map((action, index) => (
-            <span key={action}>
-              {index + 1}. {action}
-            </span>
-          ))}
+        <div className="studio-management-panel">
+          <strong>{controls.managementTitle}</strong>
+          <span>当前版本 0</span>
+          <span>批量队列 0</span>
+          <span>历史记录 0</span>
         </div>
         <button type="button" className="studio-feature-primary" disabled={running} onClick={handleRunQuickTask}>
           {running ? <RefreshCw aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
           {running ? "提交中" : "提交 API 任务"}
         </button>
         {message ? <div className="studio-feature-message">{message}</div> : null}
-        {outputs.length ? (
-          <div className="studio-feature-output">
-            {outputs.map((output) => (
-              <img src={output.url} alt={output.assetId} key={output.assetId} />
-            ))}
-          </div>
-        ) : null}
       </div>
     </section>
   );
@@ -813,6 +961,7 @@ function quickApiFlow(input: {
   pageId: ApiPageKind;
   prompt: string;
   negativePrompt: string;
+  params?: Record<string, string>;
   providerId?: string;
   model: string;
   assetId?: string;
@@ -839,6 +988,7 @@ function quickApiFlow(input: {
       providerId: input.providerId,
       model: input.model,
       negativePrompt: input.negativePrompt,
+      params: input.params,
       baseAssetId: input.assetId,
       maskAssetId: input.pageId === "klein" ? input.assetId : undefined
     }
@@ -960,12 +1110,6 @@ function CanvasEditorTopbar({
           <strong>当前画布</strong>
           <small>{savedAt ? `已保存 ${savedAt}` : status}</small>
         </div>
-      </div>
-      <div className="studio-editor-actions">
-        <IconButton title="运行" onClick={onRun} icon={Play} />
-        <IconButton title="保存" onClick={onSave} icon={Save} />
-        <IconButton title="读取" onClick={onLoad} icon={FolderOpen} />
-        <IconButton title="导出" onClick={onExport} icon={Download} />
       </div>
       <div className="studio-canvas-toolbar" aria-label="节点工具">
         <ToolbarButton title="图片" label="图片" icon={ImagePlus} onClick={() => onAddNode("image")} />
