@@ -76,6 +76,10 @@ export function addNodeToEditor(editor: Editor, definition: NodeDefinition, plac
   const bounds = editor.getViewportPageBounds();
   const x = bounds.x + 80 + (placementIndex % 3) * 300;
   const y = bounds.y + 80 + Math.floor(placementIndex / 3) * 190;
+  return addNodeToEditorAt(editor, definition, x, y);
+}
+
+export function addNodeToEditorAt(editor: Editor, definition: NodeDefinition, x: number, y: number): string {
   const shape = createNodeShape(definition, x, y);
 
   editor.createShape(shape);
@@ -84,6 +88,74 @@ export function addNodeToEditor(editor: Editor, definition: NodeDefinition, plac
   }
   editor.setCurrentTool("select");
   return String(shape.id);
+}
+
+export function connectNodes(editor: Editor, fromId: string, toId: string): string | undefined {
+  const fromShape = editor.getShape(fromId as TLShapeId);
+  const toShape = editor.getShape(toId as TLShapeId);
+  if (!fromShape || !toShape) {
+    return undefined;
+  }
+
+  const fromSize = nodeShapeSize(fromShape);
+  const toSize = nodeShapeSize(toShape);
+  const arrowId = createShapeId();
+  editor.createShape<TLArrowShape>({
+    id: arrowId,
+    type: "arrow",
+    x: fromShape.x + fromSize.w,
+    y: fromShape.y + fromSize.h / 2,
+    props: {
+      kind: "arc",
+      labelColor: "black",
+      color: "black",
+      fill: "none",
+      dash: "solid",
+      size: "m",
+      arrowheadStart: "none",
+      arrowheadEnd: "arrow",
+      font: "sans",
+      start: { x: 0, y: 0 },
+      end: {
+        x: Math.max(96, toShape.x - fromShape.x - fromSize.w),
+        y: toShape.y + toSize.h / 2 - (fromShape.y + fromSize.h / 2)
+      },
+      bend: 0,
+      text: "",
+      labelPosition: 0.5,
+      scale: 1,
+      elbowMidPoint: 0.5
+    }
+  });
+
+  editor.createBindings<TLArrowBinding>([
+    {
+      id: createBindingId(`${stripRecordPrefix(String(arrowId))}-start`),
+      type: "arrow",
+      fromId: arrowId,
+      toId: fromShape.id,
+      props: {
+        terminal: "start",
+        normalizedAnchor: { x: 1, y: 0.5 },
+        isExact: false,
+        isPrecise: false
+      }
+    },
+    {
+      id: createBindingId(`${stripRecordPrefix(String(arrowId))}-end`),
+      type: "arrow",
+      fromId: arrowId,
+      toId: toShape.id,
+      props: {
+        terminal: "end",
+        normalizedAnchor: { x: 0, y: 0.5 },
+        isExact: false,
+        isPrecise: false
+      }
+    }
+  ]);
+
+  return String(arrowId);
 }
 
 export function addOutputImagesToEditor(
@@ -316,6 +388,17 @@ export function restoreCanvasSnapshot(editor: Editor, snapshot: CanvasSnapshot):
 }
 
 function titleForNode(type: CanvasNodeKind): string {
+  const labels: Partial<Record<CanvasNodeKind, string>> = {
+    image: "图片节点",
+    prompt: "Prompt",
+    api_text2img: "文生图 API",
+    api_img2img: "图生图 API",
+    api_inpaint: "局部重绘 API",
+    video: "视频 API",
+    output: "Output"
+  };
+  return labels[type] ?? type;
+
   switch (type) {
     case "image":
       return "图片节点";
@@ -334,6 +417,14 @@ function titleForNode(type: CanvasNodeKind): string {
     default:
       return type;
   }
+}
+
+function nodeShapeSize(shape: { props?: unknown }): { w: number; h: number } {
+  const props = shape.props as { w?: unknown; h?: unknown } | undefined;
+  return {
+    w: typeof props?.w === "number" ? props.w : 260,
+    h: typeof props?.h === "number" ? props.h : 160
+  };
 }
 
 function toShapeId(id: string): TLShapeId {

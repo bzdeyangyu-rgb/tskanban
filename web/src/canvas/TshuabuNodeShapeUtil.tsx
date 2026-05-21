@@ -33,6 +33,26 @@ export class TshuabuNodeShapeUtil extends BaseBoxShapeUtil<TshuabuNodeShape> {
           <strong>{statusLabel(status)}</strong>
         </div>
         <NodeBody data={meta.data} nodeType={meta.nodeType} status={status} />
+        <button
+          className="tshuabu-node-port out"
+          type="button"
+          aria-label="拖出新节点"
+          title="拖出新节点"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent("tshuabu:link-drag-start", {
+                detail: {
+                  shapeId: shape.id,
+                  nodeType: meta.nodeType,
+                  clientX: event.clientX,
+                  clientY: event.clientY
+                }
+              })
+            );
+          }}
+        />
       </HTMLContainer>
     );
   }

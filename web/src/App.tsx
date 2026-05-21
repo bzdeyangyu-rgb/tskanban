@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
 import {
-  Box,
   Download,
   Edit3,
   FolderOpen,
@@ -21,7 +20,8 @@ import {
   Trash2,
   Workflow,
   X,
-  Zap
+  Zap,
+  type LucideIcon
 } from "lucide-react";
 import {
   executeCanvasFlow,
@@ -40,7 +40,9 @@ import { imageFilesFromList } from "./canvas/importImages";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
 import {
   addNodeToEditor,
+  addNodeToEditorAt,
   addOutputsToOutputNode,
+  connectNodes,
   isTshuabuNodeMeta,
   mergeNodeData,
   restoreCanvasSnapshot,
@@ -69,6 +71,22 @@ type CanvasGateItem = {
 
 type DrawerMode = "assets" | "nodes" | "settings" | "history" | null;
 
+type DragLink = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+type LinkCommandMenu = {
+  originId: string;
+  nodeType: CanvasNodeKind;
+  clientX: number;
+  clientY: number;
+  pageX: number;
+  pageY: number;
+};
+
 const CANVAS_LIST_KEY = "tshuabu:canvasGateItems";
 
 export function App() {
@@ -81,6 +99,8 @@ export function App() {
   const [savedAt, setSavedAt] = useState("");
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [dragLink, setDragLink] = useState<DragLink | null>(null);
+  const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
   const placementIndexRef = useRef(0);
   const canvasId = useMemo(() => {
     const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
@@ -98,6 +118,54 @@ export function App() {
       .then(setProviders)
       .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
   }, []);
+
+  useEffect(() => {
+    const handleLinkDragStart = (event: Event) => {
+      if (!editor) {
+        setStatus("画布还在加载");
+        return;
+      }
+
+      const detail = (event as CustomEvent).detail as Partial<LinkCommandMenu> & {
+        shapeId?: string;
+        clientX?: number;
+        clientY?: number;
+      };
+      if (!detail.shapeId || typeof detail.clientX !== "number" || typeof detail.clientY !== "number") {
+        return;
+      }
+
+      setLinkCommandMenu(null);
+      setDragLink({ x1: detail.clientX, y1: detail.clientY, x2: detail.clientX, y2: detail.clientY });
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        setDragLink((current) =>
+          current ? { ...current, x2: moveEvent.clientX, y2: moveEvent.clientY } : current
+        );
+      };
+
+      const handleUp = (upEvent: PointerEvent) => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        setDragLink(null);
+        const pagePoint = editor.screenToPage({ x: upEvent.clientX, y: upEvent.clientY });
+        setLinkCommandMenu({
+          originId: detail.shapeId!,
+          nodeType: (detail.nodeType as CanvasNodeKind) ?? "prompt",
+          clientX: upEvent.clientX,
+          clientY: upEvent.clientY,
+          pageX: pagePoint.x,
+          pageY: pagePoint.y
+        });
+      };
+
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp, { once: true });
+    };
+
+    window.addEventListener("tshuabu:link-drag-start", handleLinkDragStart);
+    return () => window.removeEventListener("tshuabu:link-drag-start", handleLinkDragStart);
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) {
@@ -177,6 +245,22 @@ export function App() {
       setStatus(`已添加 ${definition.title}`);
     },
     [editor, providers]
+  );
+
+  const handleCreateLinkedNode = useCallback(
+    (type: CanvasNodeKind) => {
+      if (!editor || !linkCommandMenu) {
+        return;
+      }
+
+      const definition = nodeDefinition(type, providers[0]?.id);
+      const nextId = addNodeToEditorAt(editor, definition, linkCommandMenu.pageX + 24, linkCommandMenu.pageY - 70);
+      connectNodes(editor, linkCommandMenu.originId, nextId);
+      placementIndexRef.current += 1;
+      setLinkCommandMenu(null);
+      setStatus(`已创建并连接 ${definition.title}`);
+    },
+    [editor, linkCommandMenu, providers]
   );
 
   const handleConnectMode = useCallback(() => {
@@ -422,6 +506,14 @@ export function App() {
             onUpdateSelectedNode={handleUpdateSelectedNode}
           />
         ) : null}
+        {dragLink ? <LinkDragPreview link={dragLink} /> : null}
+        {linkCommandMenu ? (
+          <LinkCommandPopover
+            menu={linkCommandMenu}
+            onClose={() => setLinkCommandMenu(null)}
+            onCreate={handleCreateLinkedNode}
+          />
+        ) : null}
         <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
         <QuickFloat onOpenSettings={() => setDrawerMode("settings")} onNewCanvas={handleNewCanvas} />
       </section>
@@ -432,11 +524,9 @@ export function App() {
 function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; onOpenDrawer: (mode: DrawerMode) => void }) {
   const navItems = [
     { key: "assets" as const, label: "本地素材", icon: Image },
-    { key: "nodes" as const, label: "快速生成", icon: Zap },
-    { key: "nodes" as const, label: "画笔编辑", icon: Edit3 },
-    { key: "nodes" as const, label: "三维参考", icon: Box },
-    { key: "settings" as const, label: "在线服务", icon: Globe2 },
-    { key: "history" as const, label: "会话记录", icon: MessageSquare },
+    { key: "nodes" as const, label: "节点工具", icon: Zap },
+    { key: "settings" as const, label: "API 设置", icon: Globe2 },
+    { key: "history" as const, label: "运行记录", icon: MessageSquare },
     { key: "assets" as const, label: "无限画布", icon: Grid3X3 }
   ];
 
@@ -466,18 +556,22 @@ function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; o
       <div className="studio-side-actions" aria-label="辅助操作">
         <button type="button" title="主题">
           <Sun aria-hidden="true" size={16} />
+          <span>黑夜模式</span>
         </button>
         <button type="button" title="语言">
           <Languages aria-hidden="true" size={16} />
+          <span>中文</span>
         </button>
-        <button type="button" title="API">
+        <button type="button" title="API 设置" onClick={() => onOpenDrawer("settings")}>
           <Link aria-hidden="true" size={16} />
+          <span>API 设置</span>
         </button>
-        <button type="button" title="ComfyUI">
+        <button type="button" title="ComfyUI 设置" onClick={() => onOpenDrawer("settings")}>
           <Workflow aria-hidden="true" size={16} />
+          <span>ComfyUI 设置</span>
         </button>
       </div>
-      <div className="studio-author">D X</div>
+      <div className="studio-author">Side</div>
     </aside>
   );
 }
@@ -575,6 +669,60 @@ function CanvasEditorTopbar({
   );
 }
 
+function LinkDragPreview({ link }: { link: DragLink }) {
+  const left = Math.min(link.x1, link.x2);
+  const top = Math.min(link.y1, link.y2);
+  const width = Math.max(1, Math.abs(link.x2 - link.x1));
+  const height = Math.max(1, Math.abs(link.y2 - link.y1));
+  return (
+    <svg
+      className="link-drag-preview"
+      style={{ left, top, width, height }}
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden="true"
+    >
+      <path
+        d={`M ${link.x1 <= link.x2 ? 0 : width} ${link.y1 <= link.y2 ? 0 : height} C ${width * 0.45} ${
+          link.y1 <= link.y2 ? 0 : height
+        }, ${width * 0.55} ${link.y1 <= link.y2 ? height : 0}, ${link.x1 <= link.x2 ? width : 0} ${
+          link.y1 <= link.y2 ? height : 0
+        }`}
+      />
+    </svg>
+  );
+}
+
+function LinkCommandPopover({
+  menu,
+  onClose,
+  onCreate
+}: {
+  menu: LinkCommandMenu;
+  onClose: () => void;
+  onCreate: (type: CanvasNodeKind) => void;
+}) {
+  const options = linkCommandOptions(menu.nodeType);
+  return (
+    <div className="link-command-popover" style={{ left: menu.clientX, top: menu.clientY }} role="menu">
+      <div className="link-command-title">添加下一步</div>
+      <div className="link-command-grid">
+        {options.map((option) => {
+          const Icon = option.icon;
+          return (
+            <button type="button" key={option.type} onClick={() => onCreate(option.type)}>
+              <Icon aria-hidden="true" size={16} />
+              <span>{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <button className="link-command-close" type="button" onClick={onClose}>
+        取消
+      </button>
+    </div>
+  );
+}
+
 function StudioDrawer({
   canvasId,
   editor,
@@ -663,12 +811,33 @@ function NanoMonitor({ queue }: { queue: number }) {
   );
 }
 
-function IconButton({ icon: Icon, onClick, title }: { icon: typeof Play; onClick: () => void; title: string }) {
+function IconButton({ icon: Icon, onClick, title }: { icon: LucideIcon; onClick: () => void; title: string }) {
   return (
     <button className="tool-btn" type="button" onClick={onClick} title={title}>
       <Icon aria-hidden="true" size={16} />
     </button>
   );
+}
+
+function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
+  if (nodeType === "api_text2img" || nodeType === "api_img2img" || nodeType === "api_inpaint" || nodeType === "video") {
+    return [{ type: "output", label: "Output", icon: Layers }];
+  }
+
+  if (nodeType === "output") {
+    return [
+      { type: "image", label: "图片节点", icon: Image },
+      { type: "prompt", label: "提示词", icon: MessageSquare }
+    ];
+  }
+
+  return [
+    { type: "api_text2img", label: "文生图", icon: Zap },
+    { type: "api_img2img", label: "图生图", icon: Image },
+    { type: "api_inpaint", label: "局部重绘", icon: Edit3 },
+    { type: "video", label: "视频生成", icon: Play },
+    { type: "output", label: "Output", icon: Layers }
+  ];
 }
 
 function drawerTitle(mode: Exclude<DrawerMode, null>): string {
