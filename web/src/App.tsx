@@ -1,6 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
-import { Download, FolderOpen, Play, Save, SlidersHorizontal } from "lucide-react";
+import {
+  Box,
+  Download,
+  Edit3,
+  FolderOpen,
+  Globe2,
+  Grid3X3,
+  Image,
+  Languages,
+  Layers,
+  Link,
+  MessageSquare,
+  Play,
+  Plus,
+  RefreshCw,
+  Save,
+  Settings,
+  Sun,
+  Trash2,
+  Workflow,
+  X,
+  Zap
+} from "lucide-react";
 import {
   executeCanvasFlow,
   fetchProviders,
@@ -39,6 +61,16 @@ type SelectedNode = {
   meta: TshuabuNodeMeta;
 };
 
+type CanvasGateItem = {
+  id: string;
+  title: string;
+  updatedAt: string;
+};
+
+type DrawerMode = "assets" | "nodes" | "settings" | "history" | null;
+
+const CANVAS_LIST_KEY = "tshuabu:canvasGateItems";
+
 export function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [status, setStatus] = useState("等待画布输入");
@@ -47,6 +79,8 @@ export function App() {
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [session, setSession] = useState<CanvasSession | null>(null);
   const [savedAt, setSavedAt] = useState("");
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const placementIndexRef = useRef(0);
   const canvasId = useMemo(() => {
     const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
@@ -57,6 +91,7 @@ export function App() {
     window.localStorage.setItem("tshuabu:lastCanvasId", next);
     return next;
   }, []);
+  const [canvasItems, setCanvasItems] = useState<CanvasGateItem[]>(() => readCanvasGateItems(canvasId));
 
   useEffect(() => {
     fetchProviders()
@@ -93,6 +128,41 @@ export function App() {
     const interval = window.setInterval(readSelection, 250);
     return () => window.clearInterval(interval);
   }, [editor]);
+
+  const persistCanvasItems = useCallback((items: CanvasGateItem[]) => {
+    setCanvasItems(items);
+    window.localStorage.setItem(CANVAS_LIST_KEY, JSON.stringify(items));
+  }, []);
+
+  const handleOpenCanvas = useCallback((itemId: string) => {
+    window.localStorage.setItem("tshuabu:lastCanvasId", itemId);
+    setIsCanvasOpen(true);
+    setStatus("画布已打开，可以开始创作");
+  }, []);
+
+  const handleNewCanvas = useCallback(() => {
+    const nextId = `c_web_${Date.now().toString(36)}`;
+    const nextItem = {
+      id: nextId,
+      title: `新建画布 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
+      updatedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem("tshuabu:lastCanvasId", nextId);
+    persistCanvasItems([nextItem, ...canvasItems].slice(0, 8));
+    setIsCanvasOpen(true);
+    setStatus("已创建新画布");
+  }, [canvasItems, persistCanvasItems]);
+
+  const handleRefreshCanvases = useCallback(() => {
+    setCanvasItems(readCanvasGateItems(canvasId));
+    setStatus("画布列表已刷新");
+  }, [canvasId]);
+
+  const handleClearCanvases = useCallback(() => {
+    const resetItems = readCanvasGateItems(canvasId, true);
+    persistCanvasItems(resetItems);
+    setStatus("已保留当前画布，清理旧入口");
+  }, [canvasId, persistCanvasItems]);
 
   const handleAddNode = useCallback(
     (type: CanvasNodeKind) => {
@@ -242,12 +312,14 @@ export function App() {
     try {
       const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
       const saved = await saveCanvasSnapshot(snapshot, "当前画布");
-      setSavedAt(new Date(saved.updatedAt).toLocaleString());
+      const nextSavedAt = new Date(saved.updatedAt).toLocaleString("zh-CN");
+      setSavedAt(nextSavedAt);
+      persistCanvasItems(upsertCanvasItem(canvasItems, canvasId, "当前画布", saved.updatedAt));
       setStatus(`画布已保存：${saved.canvasId}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
-  }, [canvasId, editor, session?.sessionId]);
+  }, [canvasId, canvasItems, editor, persistCanvasItems, session?.sessionId]);
 
   const handleLoadCanvas = useCallback(async () => {
     if (!editor) {
@@ -258,7 +330,7 @@ export function App() {
     try {
       const saved = await loadCanvasSnapshot(canvasId);
       restoreCanvasSnapshot(editor, saved);
-      setSavedAt(new Date(saved.updatedAt).toLocaleString());
+      setSavedAt(new Date(saved.updatedAt).toLocaleString("zh-CN"));
       if (saved.sessionId) {
         setSession(await fetchSession(saved.sessionId));
       }
@@ -296,60 +368,363 @@ export function App() {
   );
 
   return (
-    <main className="app-shell visual-shell shell">
-      <div className="board-skin" aria-hidden="true" />
-      <div className="topbar">
-        <aside className="panel library left-material-panel" aria-label="素材面板">
-          <AssetImportPanel disabled={!editor} onFiles={handleImportFiles} />
-          <NodePalette disabled={!editor} onAddNode={handleAddNode} onConnectMode={handleConnectMode} />
-        </aside>
-        <div className="panel canvas-nav" aria-label="当前画布">
-          <span className="canvas-preview-mark">
-            <SlidersHorizontal aria-hidden="true" size={16} />
-          </span>
-          <div className="canvas-nav-meta">
-            <strong className="current-canvas-title">Tshuabu 画布</strong>
-            <small className="current-canvas-time">{savedAt ? `已保存 ${savedAt}` : "本地工作流"}</small>
-          </div>
+    <main className="studio-app-shell">
+      <StudioSidebar onOpenDrawer={setDrawerMode} activeMode={drawerMode} />
+      <section className={`studio-stage ${isCanvasOpen ? "is-editor" : "is-gate"}`} aria-label="Tshuabu 工作区">
+        <div className={`studio-canvas-shell ${isCanvasOpen ? "canvas-open" : "no-canvas"}`}>
+          {!isCanvasOpen ? (
+            <CanvasGate
+              items={canvasItems}
+              onClear={handleClearCanvases}
+              onNew={handleNewCanvas}
+              onOpen={handleOpenCanvas}
+              onRefresh={handleRefreshCanvases}
+            />
+          ) : (
+            <>
+              <CanvasEditorTopbar
+                savedAt={savedAt}
+                status={status}
+                onClose={() => {
+                  setIsCanvasOpen(false);
+                  setDrawerMode(null);
+                }}
+                onExport={handleExportSelected}
+                onLoad={handleLoadCanvas}
+                onRun={handleRun}
+                onSave={handleSaveCanvas}
+              />
+              <section className="workspace studio-workspace" aria-label="画布">
+                <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
+                <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
+              </section>
+            </>
+          )}
         </div>
-        <div className="panel toolbar top-toolbar" aria-label="画布操作">
-          <button className="tool-btn" type="button" onClick={handleRun} disabled={!editor} title="运行">
-            <Play aria-hidden="true" size={16} />
-          </button>
-          <button className="tool-btn" type="button" onClick={handleSaveCanvas} disabled={!editor} title="保存">
-            <Save aria-hidden="true" size={16} />
-          </button>
-          <button className="tool-btn" type="button" onClick={handleLoadCanvas} disabled={!editor} title="读取">
-            <FolderOpen aria-hidden="true" size={16} />
-          </button>
-          <button className="tool-btn" type="button" onClick={handleExportSelected} disabled={!editor} title="导出">
-            <Download aria-hidden="true" size={16} />
-          </button>
-        </div>
-      </div>
-      <section className="workspace" aria-label="画布">
-        <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
-        <RunPanel onRun={handleRun} status={status} nodeCount={lastRunNodes.length} />
+        {isCanvasOpen ? (
+          <StudioDrawer
+            mode={drawerMode}
+            editor={editor}
+            providers={providers}
+            selectedNode={selectedNode}
+            session={session}
+            savedAt={savedAt}
+            canvasId={canvasId}
+            lastRunNodes={lastRunNodes}
+            onAddNode={handleAddNode}
+            onClose={() => setDrawerMode(null)}
+            onConnectMode={handleConnectMode}
+            onExport={handleExportSelected}
+            onFiles={handleImportFiles}
+            onLoad={handleLoadCanvas}
+            onProvidersChange={setProviders}
+            onSave={handleSaveCanvas}
+            onUpdateSelectedNode={handleUpdateSelectedNode}
+          />
+        ) : null}
+        <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
+        <QuickFloat onOpenSettings={() => setDrawerMode("settings")} onNewCanvas={handleNewCanvas} />
       </section>
-      <aside className="panel right-control-panel" aria-label="控制面板">
-        <ApiSettings providers={providers} onProvidersChange={setProviders} />
-        <Inspector
-          providers={providers}
-          runNodes={lastRunNodes}
-          selectedNode={selectedNode}
-          onUpdateSelectedNode={handleUpdateSelectedNode}
-        />
-        <CanvasPersistenceBar
-          canvasId={canvasId}
-          savedAt={savedAt}
-          onLoad={handleLoadCanvas}
-          onSave={handleSaveCanvas}
-          onExport={handleExportSelected}
-        />
-        <RunHistory session={session} />
-      </aside>
     </main>
   );
+}
+
+function StudioSidebar({ activeMode, onOpenDrawer }: { activeMode: DrawerMode; onOpenDrawer: (mode: DrawerMode) => void }) {
+  const navItems = [
+    { key: "assets" as const, label: "本地素材", icon: Image },
+    { key: "nodes" as const, label: "快速生成", icon: Zap },
+    { key: "nodes" as const, label: "画笔编辑", icon: Edit3 },
+    { key: "nodes" as const, label: "三维参考", icon: Box },
+    { key: "settings" as const, label: "在线服务", icon: Globe2 },
+    { key: "history" as const, label: "会话记录", icon: MessageSquare },
+    { key: "assets" as const, label: "无限画布", icon: Grid3X3 }
+  ];
+
+  return (
+    <aside className="studio-sidebar" aria-label="主导航">
+      <button className="studio-logo" type="button" aria-label="Tshuabu 首页">
+        <span />
+      </button>
+      <nav className="studio-nav">
+        {navItems.map((item, index) => {
+          const Icon = item.icon;
+          const isActive = activeMode === item.key || (!activeMode && index === navItems.length - 1);
+          return (
+            <button
+              className={`studio-nav-item ${isActive ? "is-active" : ""}`}
+              type="button"
+              key={`${item.label}-${index}`}
+              title={item.label}
+              onClick={() => onOpenDrawer(activeMode === item.key ? null : item.key)}
+            >
+              <Icon aria-hidden="true" size={18} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <div className="studio-side-actions" aria-label="辅助操作">
+        <button type="button" title="主题">
+          <Sun aria-hidden="true" size={16} />
+        </button>
+        <button type="button" title="语言">
+          <Languages aria-hidden="true" size={16} />
+        </button>
+        <button type="button" title="API">
+          <Link aria-hidden="true" size={16} />
+        </button>
+        <button type="button" title="ComfyUI">
+          <Workflow aria-hidden="true" size={16} />
+        </button>
+      </div>
+      <div className="studio-author">D X</div>
+    </aside>
+  );
+}
+
+function CanvasGate({
+  items,
+  onClear,
+  onNew,
+  onOpen,
+  onRefresh
+}: {
+  items: CanvasGateItem[];
+  onClear: () => void;
+  onNew: () => void;
+  onOpen: (itemId: string) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <section className="canvas-gate" aria-label="选择画布">
+      <div className="gate-panel">
+        <header className="gate-header">
+          <div>
+            <h1>
+              选择画布 <span>{items.length} 个</span>
+            </h1>
+            <p>打开已有画布，或新建一个开始创作。</p>
+          </div>
+          <div className="gate-actions">
+            <button type="button" onClick={onRefresh} title="刷新">
+              <RefreshCw aria-hidden="true" size={16} />
+            </button>
+            <button type="button" onClick={onClear} title="清理">
+              <Trash2 aria-hidden="true" size={16} />
+            </button>
+            <button className="gate-new" type="button" onClick={onNew}>
+              <Plus aria-hidden="true" size={16} />
+              新建画布
+            </button>
+          </div>
+        </header>
+        <div className="gate-list">
+          {items.map((item) => (
+            <button className="gate-canvas-card" type="button" key={item.id} onClick={() => onOpen(item.id)}>
+              <span className="gate-card-icon">
+                <Layers aria-hidden="true" size={17} />
+              </span>
+              <strong>{item.title}</strong>
+              <small>{formatGateTime(item.updatedAt)}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CanvasEditorTopbar({
+  savedAt,
+  status,
+  onClose,
+  onExport,
+  onLoad,
+  onRun,
+  onSave
+}: {
+  savedAt: string;
+  status: string;
+  onClose: () => void;
+  onExport: () => void;
+  onLoad: () => void;
+  onRun: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <header className="studio-editor-topbar" aria-label="画布操作">
+      <button className="canvas-return" type="button" onClick={onClose} title="返回画布列表">
+        <Grid3X3 aria-hidden="true" size={16} />
+      </button>
+      <div className="canvas-title-pill">
+        <span className="canvas-preview-mark">
+          <Layers aria-hidden="true" size={16} />
+        </span>
+        <div>
+          <strong>当前画布</strong>
+          <small>{savedAt ? `已保存 ${savedAt}` : status}</small>
+        </div>
+      </div>
+      <div className="studio-editor-actions">
+        <IconButton title="运行" onClick={onRun} icon={Play} />
+        <IconButton title="保存" onClick={onSave} icon={Save} />
+        <IconButton title="读取" onClick={onLoad} icon={FolderOpen} />
+        <IconButton title="导出" onClick={onExport} icon={Download} />
+      </div>
+    </header>
+  );
+}
+
+function StudioDrawer({
+  canvasId,
+  editor,
+  lastRunNodes,
+  mode,
+  providers,
+  savedAt,
+  selectedNode,
+  session,
+  onAddNode,
+  onClose,
+  onConnectMode,
+  onExport,
+  onFiles,
+  onLoad,
+  onProvidersChange,
+  onSave,
+  onUpdateSelectedNode
+}: {
+  canvasId: string;
+  editor: Editor | null;
+  lastRunNodes: FlowExecutionNode[];
+  mode: DrawerMode;
+  providers: ApiProvider[];
+  savedAt: string;
+  selectedNode: SelectedNode | null;
+  session: CanvasSession | null;
+  onAddNode: (type: CanvasNodeKind) => void;
+  onClose: () => void;
+  onConnectMode: () => void;
+  onExport: () => void;
+  onFiles: (files: File[]) => void;
+  onLoad: () => void;
+  onProvidersChange: (providers: ApiProvider[]) => void;
+  onSave: () => void;
+  onUpdateSelectedNode: (patch: Record<string, unknown>) => void;
+}) {
+  if (!mode) {
+    return null;
+  }
+
+  return (
+    <aside className="studio-drawer panel" aria-label="工具抽屉">
+      <header className="studio-drawer-head">
+        <strong>{drawerTitle(mode)}</strong>
+        <button type="button" onClick={onClose} title="关闭">
+          <X aria-hidden="true" size={16} />
+        </button>
+      </header>
+      {mode === "assets" ? <AssetImportPanel disabled={!editor} onFiles={onFiles} /> : null}
+      {mode === "nodes" ? <NodePalette disabled={!editor} onAddNode={onAddNode} onConnectMode={onConnectMode} /> : null}
+      {mode === "settings" ? (
+        <>
+          <ApiSettings providers={providers} onProvidersChange={onProvidersChange} />
+          <Inspector providers={providers} runNodes={lastRunNodes} selectedNode={selectedNode} onUpdateSelectedNode={onUpdateSelectedNode} />
+          <CanvasPersistenceBar canvasId={canvasId} savedAt={savedAt} onLoad={onLoad} onSave={onSave} onExport={onExport} />
+        </>
+      ) : null}
+      {mode === "history" ? <RunHistory session={session} /> : null}
+    </aside>
+  );
+}
+
+function QuickFloat({ onNewCanvas, onOpenSettings }: { onNewCanvas: () => void; onOpenSettings: () => void }) {
+  return (
+    <div className="studio-quick-float" aria-label="快捷操作">
+      <button type="button" onClick={onNewCanvas} title="新建画布">
+        <Grid3X3 aria-hidden="true" size={16} />
+      </button>
+      <button type="button" onClick={onOpenSettings} title="设置">
+        <Settings aria-hidden="true" size={16} />
+      </button>
+    </div>
+  );
+}
+
+function NanoMonitor({ queue }: { queue: number }) {
+  return (
+    <div className="nano-monitor" aria-label="运行状态">
+      <span className="online-dot" />
+      <b>ONLINE</b>
+      <strong>1</strong>
+      <b>QUEUE</b>
+      <strong>{queue}</strong>
+    </div>
+  );
+}
+
+function IconButton({ icon: Icon, onClick, title }: { icon: typeof Play; onClick: () => void; title: string }) {
+  return (
+    <button className="tool-btn" type="button" onClick={onClick} title={title}>
+      <Icon aria-hidden="true" size={16} />
+    </button>
+  );
+}
+
+function drawerTitle(mode: Exclude<DrawerMode, null>): string {
+  switch (mode) {
+    case "assets":
+      return "本地素材";
+    case "nodes":
+      return "节点工具";
+    case "settings":
+      return "画布控制";
+    case "history":
+      return "运行记录";
+  }
+}
+
+function readCanvasGateItems(canvasId: string, reset = false): CanvasGateItem[] {
+  const fallback = [
+    {
+      id: canvasId,
+      title: "新建画布 10:18",
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "c_web_reference_1720",
+      title: "新建画布 17:20",
+      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    }
+  ];
+
+  if (reset) {
+    return fallback.slice(0, 1);
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CANVAS_LIST_KEY);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw) as CanvasGateItem[];
+    return parsed.length > 0 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function upsertCanvasItem(items: CanvasGateItem[], id: string, title: string, updatedAt: string): CanvasGateItem[] {
+  const nextItem = { id, title, updatedAt };
+  return [nextItem, ...items.filter((item) => item.id !== id)].slice(0, 8);
+}
+
+function formatGateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "刚刚";
+  }
+  return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
 
 function seedStarterCanvas(editor: Editor, providerId?: string): void {

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tshuabu UI 真实案例对比</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: #e8edf6;
+        background: #08090c;
+        font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 18px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 16px;
+      }
+
+      header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 6px 0 0;
+        color: #92a0b3;
+        font-size: 13px;
+      }
+
+      .source {
+        display: flex;
+        gap: 8px;
+        color: #cbd5e1;
+        font-size: 12px;
+      }
+
+      .source span {
+        padding: 6px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 999px;
+        background: #101722;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        min-height: 0;
+      }
+
+      .frame {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 28px;
+        background: #0f141d;
+      }
+
+      .frame-head {
+        height: 48px;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        background: #111722;
+      }
+
+      .frame-head strong {
+        font-size: 13px;
+      }
+
+      .frame-head small {
+        color: #92a0b3;
+        font-size: 11px;
+      }
+
+      .mock {
+        position: relative;
+        height: calc(100vh - 136px);
+        min-height: 640px;
+        overflow: hidden;
+        background: #08090c;
+      }
+
+      .sidebar {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 80px;
+        padding: 24px 16px 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        border-right: 1px solid rgba(148, 163, 184, 0.16);
+        background: #0b1018;
+      }
+
+      .logo,
+      .nav i,
+      .side-actions i {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+      }
+
+      .logo {
+        border: 1px solid #e9eef7;
+      }
+
+      .logo::after {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: #e9eef7;
+      }
+
+      .nav {
+        display: grid;
+        gap: 26px;
+      }
+
+      .nav i,
+      .side-actions i {
+        color: #92a0b3;
+        font-style: normal;
+        font-size: 15px;
+      }
+
+      .nav i.active {
+        color: #0b111a;
+        background: #eef3fb;
+      }
+
+      .side-actions {
+        margin-top: auto;
+        display: grid;
+        gap: 10px;
+      }
+
+      .stage {
+        position: absolute;
+        inset: 8px 8px 8px 98px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 32px;
+        background-color: #0f141d;
+        background-image: radial-gradient(rgba(148, 163, 184, 0.13) 1px, transparent 1px);
+        background-size: 24px 24px;
+      }
+
+      .gate {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 548px;
+        min-height: 234px;
+        padding: 24px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(197, 210, 225, 0.26);
+        border-radius: 24px;
+        background: rgba(23, 29, 41, 0.94);
+      }
+
+      .gate-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .gate h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      .gate h2 span {
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #111827;
+        font-size: 12px;
+      }
+
+      .gate p {
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .actions b {
+        min-width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 13px;
+        background: #101722;
+        font-size: 12px;
+      }
+
+      .actions b.new {
+        min-width: 104px;
+        color: #0b111a;
+        background: #dfe7f4;
+      }
+
+      .cards {
+        margin-top: 18px;
+        min-height: 134px;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 18px;
+        background: #101722;
+      }
+
+      .card {
+        height: 112px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 14px;
+        background: #171d29;
+      }
+
+      .card::before {
+        content: "";
+        display: block;
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 11px;
+        background: #101722;
+      }
+
+      .card strong,
+      .card small {
+        display: block;
+        border-radius: 999px;
+      }
+
+      .card strong {
+        width: 76%;
+        height: 10px;
+        margin-top: 12px;
+        background: #e8edf6;
+      }
+
+      .card small {
+        width: 48%;
+        height: 9px;
+        margin-top: 32px;
+        background: #59687d;
+      }
+
+      .nano {
+        position: absolute;
+        left: 22px;
+        bottom: 22px;
+        width: 146px;
+        height: 28px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 999px;
+        background: #121a27;
+      }
+
+      .float {
+        position: absolute;
+        right: 8px;
+        top: 27%;
+        display: grid;
+        gap: 10px;
+      }
+
+      .float i {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: rgba(190, 72, 117, 0.86);
+      }
+
+      .wrong .stage {
+        background: #ffffff;
+        background-image: none;
+      }
+
+      .wrong-panel {
+        position: absolute;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 18px;
+        background: #f8fafc;
+      }
+
+      .wrong-left {
+        left: 24px;
+        top: 24px;
+        width: 310px;
+        height: 440px;
+      }
+
+      .wrong-right {
+        right: 24px;
+        top: 92px;
+        width: 360px;
+        height: 520px;
+      }
+
+      .wrong-top {
+        left: 50%;
+        top: 24px;
+        width: 260px;
+        height: 52px;
+        transform: translateX(-50%);
+      }
+
+      .note {
+        position: absolute;
+        max-width: 260px;
+        padding: 10px 12px;
+        border: 1px solid rgba(248, 113, 113, 0.34);
+        border-radius: 12px;
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.28);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 1180px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .mock {
+          height: 720px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div>
+          <h1>UI 对比修正版：真实案例首屏 vs 旧实现偏差</h1>
+          <p>案例不是单独的 canvas 内页，而是 static/index.html 的 studio 外壳，再承载 canvas.html 的选择画布状态。</p>
+        </div>
+        <div class="source">
+          <span>案例入口：static/index.html</span>
+          <span>画布门页：static/canvas.html</span>
+        </div>
+      </header>
+
+      <section class="grid">
+        <article class="frame">
+          <div class="frame-head">
+            <strong>A 真实案例首屏</strong>
+            <small>左侧外壳 + 大舞台 + 中央选择画布</small>
+          </div>
+          <div class="mock">
+            <aside class="sidebar">
+              <div class="logo"></div>
+              <div class="nav">
+                <i>□</i><i>ϟ</i><i>↗</i><i>◇</i><i>◎</i><i>▱</i><i class="active">▦</i>
+              </div>
+              <div class="side-actions"><i>☼</i><i>◎</i><i>↔</i><i>▦</i></div>
+              <b>DX</b>
+            </aside>
+            <section class="stage">
+              <div class="gate">
+                <div class="gate-top">
+                  <div>
+                    <h2>选择画布 <span>2 个</span></h2>
+                    <p>打开已有画布，或新建一个开始创作。</p>
+                  </div>
+                  <div class="actions"><b>⟳</b><b>⌫</b><b class="new">+ 新建画布</b></div>
+                </div>
+                <div class="cards">
+                  <div class="card"><strong></strong><small></small></div>
+                  <div class="card"><strong></strong><small></small></div>
+                </div>
+              </div>
+              <div class="nano"></div>
+              <div class="float"><i></i><i></i></div>
+            </section>
+          </div>
+        </article>
+
+        <article class="frame">
+          <div class="frame-head">
+            <strong>B 旧方向的问题</strong>
+            <small>功能面板抢首屏，像原型工作台</small>
+          </div>
+          <div class="mock wrong">
+            <aside class="sidebar">
+              <div class="logo"></div>
+              <div class="nav">
+                <i>□</i><i>ϟ</i><i>↗</i><i>◇</i><i>◎</i><i>▱</i><i class="active">▦</i>
+              </div>
+            </aside>
+            <section class="stage">
+              <div class="wrong-panel wrong-left"></div>
+              <div class="wrong-panel wrong-top"></div>
+              <div class="wrong-panel wrong-right"></div>
+              <div class="note" style="left: 46px; top: 490px">左侧本地素材变成常驻大面板，不是案例里的收纳式导航。</div>
+              <div class="note" style="right: 50px; top: 640px">右侧画笔/API/属性常驻压住画布，这是用户看到“错乱”的主要来源。</div>
+              <div class="note" style="left: 390px; top: 120px">缺少案例首屏的中央选择画布门页，所以一进去就像半成品编辑器。</div>
+            </section>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
