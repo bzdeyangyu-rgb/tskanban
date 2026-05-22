@@ -54,7 +54,8 @@ type DragLink = { fromId: string; fromType: CanvasNodeKind; x1: number; y1: numb
 type DragState =
   | { type: "node"; id: string; startX: number; startY: number; nodes: Array<{ id: string; x: number; y: number }> }
   | { type: "resize"; id: string; startX: number; startY: number; x: number; y: number; width: number; height: number }
-  | { type: "pan"; startX: number; startY: number; x: number; y: number };
+  | { type: "pan"; startX: number; startY: number; x: number; y: number }
+  | { type: "select"; startX: number; startY: number; currentX: number; currentY: number };
 
 const MIN_NODE_WIDTH = 220;
 const MIN_NODE_HEIGHT = 126;
@@ -212,6 +213,12 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         }));
       }
 
+      if (dragState?.type === "select") {
+        setDragState((current) =>
+          current?.type === "select" ? { ...current, currentX: event.clientX, currentY: event.clientY } : current
+        );
+      }
+
       if (dragLink) {
         setDragLink((current) => (current ? { ...current, x2: event.clientX, y2: event.clientY } : current));
       }
@@ -238,6 +245,14 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             canvasY: point.y
           });
         }
+      }
+      if (dragState?.type === "select") {
+        const start = screenToCanvas(dragState.startX, dragState.startY);
+        const end = screenToCanvas(event.clientX, event.clientY);
+        const rect = normalizedRect(start.x, start.y, end.x, end.y);
+        const picked = nodes.filter((node) => rectIntersectsNode(rect, node)).map((node) => node.id);
+        setSelectedIds(picked);
+        onStatus(picked.length > 0 ? `已框选 ${picked.length} 个节点` : "未框选到节点");
       }
       setDragState(null);
       setDragLink(null);
@@ -354,6 +369,16 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       return;
     }
     setCreateMenu(null);
+    if (event.ctrlKey || event.metaKey) {
+      setDragState({
+        type: "select",
+        startX: event.clientX,
+        startY: event.clientY,
+        currentX: event.clientX,
+        currentY: event.clientY
+      });
+      return;
+    }
     setSelectedIds([]);
     setDragState({ type: "pan", startX: event.clientX, startY: event.clientY, x: viewport.x, y: viewport.y });
   };
@@ -458,6 +483,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         ))}
       </div>
       {dragLink ? <LinkPreview link={dragLink} /> : null}
+      {dragState?.type === "select" ? <SelectionBox selection={dragState} /> : null}
       {createMenu ? (
         <CreateNodeMenu
           menu={createMenu}
@@ -657,6 +683,14 @@ function LinkPreview({ link }: { link: DragLink }) {
   );
 }
 
+function SelectionBox({ selection }: { selection: Extract<DragState, { type: "select" }> }) {
+  const left = Math.min(selection.startX, selection.currentX);
+  const top = Math.min(selection.startY, selection.currentY);
+  const width = Math.abs(selection.currentX - selection.startX);
+  const height = Math.abs(selection.currentY - selection.startY);
+  return <div className="reference-selection-box" style={{ left, top, width, height }} aria-hidden="true" />;
+}
+
 function starterNodes(providerId?: string): CanvasNode[] {
   const providerData = providerId ? { providerId } : {};
   return [
@@ -728,6 +762,28 @@ function linkPath(from: CanvasNode, to: CanvasNode): string {
 
 function nodePortPoint(node: CanvasNode): { x: number; y: number } {
   return { x: node.x + node.width, y: node.y + node.height / 2 };
+}
+
+function normalizedRect(x1: number, y1: number, x2: number, y2: number): { left: number; top: number; right: number; bottom: number } {
+  return {
+    left: Math.min(x1, x2),
+    top: Math.min(y1, y2),
+    right: Math.max(x1, x2),
+    bottom: Math.max(y1, y2)
+  };
+}
+
+function rectIntersectsNode(
+  rect: { left: number; top: number; right: number; bottom: number },
+  node: CanvasNode
+): boolean {
+  const nodeRect = {
+    left: node.x,
+    top: node.y,
+    right: node.x + node.width,
+    bottom: node.y + node.height
+  };
+  return rect.left <= nodeRect.right && rect.right >= nodeRect.left && rect.top <= nodeRect.bottom && rect.bottom >= nodeRect.top;
 }
 
 function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
