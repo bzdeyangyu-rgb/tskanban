@@ -3111,6 +3111,170 @@ button {
   height: 54px;
 }
 
+.reference-generator-body {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.reference-prompt-list {
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+}
+
+.reference-prompt-list:empty {
+  display: none;
+}
+
+.reference-prompt-list span,
+.reference-generator-label {
+  color: #8ea3c4;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reference-prompt-list p {
+  max-height: 44px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  color: #c9d3e4;
+  background: #101722;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.reference-input-list {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  border-radius: 14px;
+  color: #8ea3c4;
+  background: rgba(11, 17, 26, 0.58);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.reference-gen-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(16, 23, 34, 0.96), rgba(11, 17, 26, 0.9));
+}
+
+.reference-gen-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-gen-row select,
+.reference-gen-row input {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  color: #e5e9f0;
+  background: #0b111a;
+  outline: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reference-gen-row > select,
+.reference-gen-row > input {
+  flex: 1 1 0;
+  padding: 0 10px;
+}
+
+.reference-gen-row label {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: #8ea3c4;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.reference-gen-row label input {
+  width: 100%;
+  padding: 0 10px;
+}
+
+.reference-gen-stepper {
+  flex: 0 0 94px;
+  height: 32px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: #0b111a;
+}
+
+.reference-gen-stepper button,
+.reference-gen-stepper input {
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  color: #d8dee9;
+  background: transparent;
+  text-align: center;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.reference-gen-stepper button {
+  cursor: pointer;
+}
+
+.reference-gen-stepper button:hover {
+  background: rgba(216, 222, 233, 0.1);
+}
+
+.reference-gen-run-row {
+  margin-top: auto;
+  display: flex;
+}
+
+.reference-gen-btn {
+  width: 100%;
+  height: 40px;
+  border: 0;
+  border-radius: 16px;
+  color: #0b111a;
+  background: #edf2fa;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.18);
+}
+
+.reference-gen-btn:hover {
+  background: #ffffff;
+}
+
 .reference-output-grid {
   height: 100%;
   display: grid;

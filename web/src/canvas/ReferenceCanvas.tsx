@@ -619,6 +619,10 @@ function renderNodeBody(
     );
   }
 
+  if (isApiImageNode(node.type)) {
+    return <ReferenceGeneratorBody node={node} onData={onData} />;
+  }
+
   if (node.type === "output") {
     const outputs = Array.isArray(node.data.outputs) ? node.data.outputs.filter(isOutputAsset) : [];
     return outputs.length ? (
@@ -653,6 +657,111 @@ function renderNodeBody(
           onChange={(event) => onData(node.id, { negativePrompt: event.target.value })}
         />
       </label>
+    </div>
+  );
+}
+
+function ReferenceGeneratorBody({
+  node,
+  onData
+}: {
+  node: CanvasNode;
+  onData: (nodeId: string, patch: Record<string, unknown>) => void;
+}) {
+  const prompt = stringValue(node.data.prompt);
+  const providerId = stringValue(node.data.providerId);
+  const model = stringValue(node.data.model) || "gpt-image-2";
+  const resolution = stringValue(node.data.resolution) || "1k";
+  const ratio = stringValue(node.data.ratio) || "square";
+  const count = clamp(Number(node.data.count) || 1, 1, 8);
+  const customWidth = stringValue(node.data.customWidth);
+  const customHeight = stringValue(node.data.customHeight);
+  const showCustomSize = resolution === "custom" || ratio === "custom";
+
+  const setCount = (next: number) => onData(node.id, { count: clamp(next, 1, 8) });
+
+  return (
+    <div className="reference-generator-body">
+      <div className="reference-prompt-list">
+        {prompt ? (
+          <>
+            <span>Prompts</span>
+            <p>{prompt}</p>
+          </>
+        ) : null}
+      </div>
+      <div className="reference-generator-label">Images</div>
+      <div className="reference-input-list">
+        <span>连接图片、Output 或分组后显示输入素材</span>
+      </div>
+      <div className="reference-gen-settings">
+        <div className="reference-gen-row">
+          <select value={providerId} onChange={(event) => onData(node.id, { providerId: event.target.value })}>
+            <option value="">默认 API</option>
+            <option value="openai">OpenAI</option>
+            <option value="apimart">APIMart</option>
+          </select>
+          <input value={model} onChange={(event) => onData(node.id, { model: event.target.value })} />
+        </div>
+        <div className="reference-gen-row">
+          <select value={resolution} onChange={(event) => onData(node.id, { resolution: event.target.value })}>
+            <option value="1k">1K</option>
+            <option value="2k">2K</option>
+            <option value="4k">4K</option>
+            <option value="custom">自定义</option>
+          </select>
+          <select value={ratio} onChange={(event) => onData(node.id, { ratio: event.target.value })}>
+            <option value="square">1:1</option>
+            <option value="portrait">2:3</option>
+            <option value="landscape">3:2</option>
+            <option value="portrait43">3:4</option>
+            <option value="landscape43">4:3</option>
+            <option value="story">9:16</option>
+            <option value="wide">16:9</option>
+            <option value="custom">自定义</option>
+          </select>
+          <div className="reference-gen-stepper">
+            <button type="button" onClick={() => setCount(count - 1)} aria-label="减少数量">
+              ‹
+            </button>
+            <input value={count} inputMode="numeric" onChange={(event) => setCount(Number(event.target.value) || 1)} />
+            <button type="button" onClick={() => setCount(count + 1)} aria-label="增加数量">
+              ›
+            </button>
+          </div>
+        </div>
+        {showCustomSize ? (
+          <div className="reference-gen-row">
+            <label>
+              <span>Width</span>
+              <input
+                type="number"
+                min="64"
+                step="64"
+                value={customWidth}
+                placeholder="Auto"
+                onChange={(event) => onData(node.id, { customWidth: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>Height</span>
+              <input
+                type="number"
+                min="64"
+                step="64"
+                value={customHeight}
+                placeholder="Auto"
+                onChange={(event) => onData(node.id, { customHeight: event.target.value })}
+              />
+            </label>
+          </div>
+        ) : null}
+      </div>
+      <div className="reference-gen-run-row">
+        <button type="button" className="reference-gen-btn">
+          {node.type === "api_text2img" ? "API生成" : node.type === "api_img2img" ? "MS生成" : "局部重绘"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -717,9 +826,9 @@ function starterNodes(providerId?: string): CanvasNode[] {
       type: "api_img2img",
       x: 810,
       y: 120,
-      width: 330,
-      height: 230,
-      data: { ...providerData, model: "gpt-image-2", params: { strength: 0.55 } },
+      width: 380,
+      height: 360,
+      data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1, params: { strength: 0.55 } },
       status: "idle"
     },
     { id: "starter_output", type: "output", x: 1210, y: 120, width: 360, height: 250, data: {}, status: "idle" }
@@ -744,9 +853,9 @@ function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeDefiniti
     case "loop":
       return { type, title: "循环", data: { count: 4, prompt: "" }, width: 300, height: 200 };
     case "api_img2img":
-      return { type, title: "MS生成", data: { ...providerData, model: "gpt-image-2" }, width: 330, height: 230 };
+      return { type, title: "MS生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
     case "api_inpaint":
-      return { type, title: "局部重绘", data: { ...providerData, model: "gpt-image-2" }, width: 330, height: 230 };
+      return { type, title: "局部重绘", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
     case "video":
       return { type, title: "视频生成", data: { ...providerData, model: "" }, width: 330, height: 220 };
     case "comfy":
@@ -755,7 +864,7 @@ function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeDefiniti
       return { type, title: "Output", data: {}, width: 360, height: 250 };
     case "api_text2img":
     default:
-      return { type: "api_text2img", title: "API生成", data: { ...providerData, model: "gpt-image-2" }, width: 330, height: 230 };
+      return { type: "api_text2img", title: "API生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
   }
 }
 
@@ -897,6 +1006,10 @@ function stringValue(value: unknown): string {
     return String(value);
   }
   return typeof value === "string" ? value : "";
+}
+
+function isApiImageNode(type: CanvasNodeKind): boolean {
+  return type === "api_text2img" || type === "api_img2img" || type === "api_inpaint";
 }
 
 function isOutputAsset(value: unknown): value is { assetId: string; url: string } {
