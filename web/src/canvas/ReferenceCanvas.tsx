@@ -52,7 +52,7 @@ type Viewport = { x: number; y: number; zoom: number };
 type CreateMenu = { fromId: string; x: number; y: number; canvasX: number; canvasY: number; fromType: CanvasNodeKind };
 type DragLink = { fromId: string; fromType: CanvasNodeKind; x1: number; y1: number; x2: number; y2: number };
 type DragState =
-  | { type: "node"; id: string; startX: number; startY: number; nodes: Array<{ id: string; x: number; y: number }> }
+  | { type: "node"; id: string; startX: number; startY: number; ids: string[]; nodes: CanvasNode[] }
   | { type: "resize"; id: string; startX: number; startY: number; x: number; y: number; width: number; height: number }
   | { type: "pan"; startX: number; startY: number; x: number; y: number }
   | { type: "select"; startX: number; startY: number; currentX: number; currentY: number };
@@ -70,6 +70,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   const [nodes, setNodes] = useState<CanvasNode[]>(() => starterNodes(defaultProviderId));
   const [edges, setEdges] = useState<CanvasEdge[]>(starterEdges());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 80, y: 80, zoom: 0.92 });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
@@ -144,15 +145,19 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   }, []);
 
   const deleteSelected = useCallback(() => {
-    if (selectedIds.length === 0) {
+    if (selectedIds.length === 0 && !selectedEdgeId) {
       return;
     }
-    const selected = new Set(selectedIds);
-    setNodes((current) => current.filter((node) => !selected.has(node.id)));
-    setEdges((current) => current.filter((edge) => !selected.has(edge.from) && !selected.has(edge.to)));
+    const deletedNodeCount = selectedIds.length;
+    setNodes((currentNodes) => {
+      const result = deleteCanvasSelection(currentNodes, edges, selectedIds, selectedEdgeId);
+      setEdges(result.edges);
+      return result.nodes;
+    });
     setSelectedIds([]);
-    onStatus(`已删除 ${selectedIds.length} 个节点`);
-  }, [onStatus, selectedIds]);
+    setSelectedEdgeId(null);
+    onStatus(selectedEdgeId ? "已删除 1 条连线" : `已删除 ${deletedNodeCount} 个节点`);
+  }, [edges, onStatus, selectedEdgeId, selectedIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -179,12 +184,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       if (dragState?.type === "node") {
         const dx = (event.clientX - dragState.startX) / viewport.zoom;
         const dy = (event.clientY - dragState.startY) / viewport.zoom;
-        setNodes((current) =>
-          current.map((node) => {
-            const start = dragState.nodes.find((item) => item.id === node.id);
-            return start ? { ...node, x: start.x + dx, y: start.y + dy } : node;
-          })
-        );
+        setNodes(moveCanvasNodes(dragState.nodes, dragState.ids, dx, dy));
       }
 
       if (dragState?.type === "resize") {
@@ -369,6 +369,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       return;
     }
     setCreateMenu(null);
+    setSelectedEdgeId(null);
     if (event.ctrlKey || event.metaKey) {
       setDragState({
         type: "select",
@@ -412,7 +413,19 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             if (!from || !to) {
               return null;
             }
-            return <path d={linkPath(from, to)} key={edge.id} />;
+            return (
+              <path
+                className={selectedEdgeId === edge.id ? "is-selected" : ""}
+                d={linkPath(from, to)}
+                key={edge.id}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  setCreateMenu(null);
+                  setSelectedIds([]);
+                  setSelectedEdgeId(edge.id);
+                }}
+              />
+            );
           })}
         </g>
       </svg>
@@ -444,6 +457,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             onSelect={(event) => {
               event.stopPropagation();
               setCreateMenu(null);
+              setSelectedEdgeId(null);
               setSelectedIds((current) =>
                 event.ctrlKey || event.metaKey
                   ? current.includes(node.id)
@@ -455,13 +469,15 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             onDragStart={(event) => {
               event.stopPropagation();
               const ids = selectedIds.includes(node.id) ? selectedIds : [node.id];
+              const dragIds = collectDragNodeIds(nodes, ids, node.id);
               setSelectedIds(ids);
               setDragState({
                 type: "node",
                 id: node.id,
                 startX: event.clientX,
                 startY: event.clientY,
-                nodes: nodes.filter((item) => ids.includes(item.id)).map((item) => ({ id: item.id, x: item.x, y: item.y }))
+                ids: dragIds,
+                nodes
               });
             }}
             onResizeStart={(event) => {
@@ -784,6 +800,50 @@ function rectIntersectsNode(
     bottom: node.y + node.height
   };
   return rect.left <= nodeRect.right && rect.right >= nodeRect.left && rect.top <= nodeRect.bottom && rect.bottom >= nodeRect.top;
+}
+
+export function collectDragNodeIds(nodes: CanvasNode[], selectedIds: string[], activeId: string): string[] {
+  const baseIds = selectedIds.includes(activeId) ? selectedIds : [activeId];
+  const result = new Set<string>();
+
+  for (const id of baseIds) {
+    result.add(id);
+    const node = nodes.find((item) => item.id === id);
+    if (node?.type === "group" && Array.isArray(node.data.childIds)) {
+      for (const childId of node.data.childIds) {
+        if (typeof childId === "string") {
+          result.add(childId);
+        }
+      }
+    }
+  }
+
+  return Array.from(result);
+}
+
+export function moveCanvasNodes(nodes: CanvasNode[], dragIds: string[], dx: number, dy: number): CanvasNode[] {
+  const moving = new Set(dragIds);
+  return nodes.map((node) => (moving.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node));
+}
+
+export function deleteCanvasSelection(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[],
+  selectedIds: string[],
+  selectedEdgeId: string | null
+): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
+  if (selectedIds.length === 0 && selectedEdgeId) {
+    return {
+      nodes,
+      edges: edges.filter((edge) => edge.id !== selectedEdgeId)
+    };
+  }
+
+  const selected = new Set(selectedIds);
+  return {
+    nodes: nodes.filter((node) => !selected.has(node.id)),
+    edges: edges.filter((edge) => !selected.has(edge.from) && !selected.has(edge.to))
+  };
 }
 
 function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
