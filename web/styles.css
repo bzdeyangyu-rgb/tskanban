@@ -2514,6 +2514,10 @@ button {
   backdrop-filter: blur(18px);
 }
 
+.studio-stage.is-editor .canvas-title-pill {
+  display: none;
+}
+
 .canvas-title-pill strong,
 .canvas-title-pill small {
   display: block;
@@ -2873,6 +2877,362 @@ button {
   margin-top: 8px;
   color: #92a0b3;
   background: transparent;
+}
+
+.reference-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: #0f141d;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.13) 1px, transparent 1px);
+  background-size: 24px 24px;
+  cursor: grab;
+}
+
+.reference-canvas:active {
+  cursor: grabbing;
+}
+
+.reference-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.reference-links path {
+  fill: none;
+  stroke: #d8dee9;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.34));
+}
+
+.reference-canvas-plane {
+  position: absolute;
+  inset: 0;
+  transform: translate(var(--canvas-x), var(--canvas-y)) scale(var(--canvas-z));
+  transform-origin: 0 0;
+}
+
+.reference-node {
+  position: absolute;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  color: var(--text);
+  background: #171d29;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
+  cursor: default;
+  overflow: visible;
+}
+
+.reference-node.is-selected {
+  border-color: #d8dee9;
+  box-shadow: 0 0 0 1px rgba(216, 222, 233, 0.35), 0 18px 48px rgba(0, 0, 0, 0.3);
+}
+
+.reference-node.running,
+.reference-node.retrying {
+  border-color: rgba(96, 165, 250, 0.52);
+}
+
+.reference-node.success {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.reference-node.failed {
+  border-color: rgba(248, 113, 113, 0.58);
+}
+
+.reference-node-group {
+  background: rgba(20, 27, 39, 0.22);
+  border-style: dashed;
+  pointer-events: auto;
+}
+
+.reference-node-head {
+  min-width: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 21px 21px 0 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: #171d29;
+  cursor: move;
+  user-select: none;
+}
+
+.reference-node-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 9px;
+  color: #9fb0cf;
+  background: #101722;
+  flex: 0 0 auto;
+}
+
+.reference-node-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #eef3fb;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.reference-node-head small {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #9aa6b8;
+  background: rgba(148, 163, 184, 0.1);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.reference-node-body {
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.reference-image-drop {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 92px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  border-radius: 16px;
+  color: #8ea3c4;
+  background: #0b111a;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reference-image-drop img,
+.reference-output-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0b111a;
+}
+
+.reference-image-drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reference-prompt-field {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  height: 100%;
+}
+
+.reference-prompt-field textarea,
+.reference-node-form textarea,
+.reference-node-form input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 13px;
+  color: #e5e9f0;
+  background: #101722;
+  outline: none;
+  font: inherit;
+  font-size: 12px;
+}
+
+.reference-prompt-field textarea,
+.reference-node-form textarea {
+  min-height: 0;
+  padding: 10px;
+  resize: none;
+  line-height: 1.55;
+  scrollbar-width: none;
+}
+
+.reference-prompt-field textarea::-webkit-scrollbar,
+.reference-node-form textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.reference-prompt-field small {
+  justify-self: end;
+  color: #8ea3c4;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reference-node-form {
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  overflow: hidden;
+}
+
+.reference-node-form label {
+  display: grid;
+  gap: 5px;
+  color: #9aa6b8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reference-node-form input {
+  height: 34px;
+  padding: 0 10px;
+}
+
+.reference-node-form textarea {
+  height: 54px;
+}
+
+.reference-output-grid {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+}
+
+.reference-output-grid img {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+}
+
+.reference-empty,
+.reference-group-label {
+  height: 100%;
+  min-height: 80px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  color: #8ea3c4;
+  background: rgba(11, 17, 26, 0.54);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reference-node-port {
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  z-index: 7;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  border: 2px solid #d8dee9;
+  border-radius: 999px;
+  background: #111827;
+  box-shadow: 0 0 0 5px rgba(15, 23, 42, 0.68);
+  cursor: crosshair;
+}
+
+.reference-node-port:hover {
+  background: #d8dee9;
+  box-shadow: 0 0 0 8px rgba(216, 222, 233, 0.16);
+}
+
+.reference-node-resize {
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+  z-index: 8;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 0 12px 0 21px;
+  background:
+    linear-gradient(135deg, transparent 0 49%, rgba(216, 222, 233, 0.72) 50% 56%, transparent 57%),
+    linear-gradient(135deg, transparent 0 66%, rgba(216, 222, 233, 0.4) 67% 72%, transparent 73%);
+  cursor: nesw-resize;
+}
+
+.reference-create-menu {
+  position: fixed;
+  z-index: 92;
+  width: 220px;
+  padding: 10px;
+  transform: translate(10px, -10px);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  background: rgba(17, 23, 34, 0.96);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.reference-create-title {
+  padding: 3px 4px 9px;
+  color: #92a0b3;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.reference-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.reference-create-grid button,
+.reference-create-close {
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  color: #d8dee9;
+  background: #101722;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reference-create-grid button:hover {
+  color: #0f172a;
+  background: #d8dee9;
+}
+
+.reference-create-close {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 8px;
+  color: #92a0b3;
+  background: transparent;
+}
+
+.reference-link-preview {
+  position: fixed;
+  z-index: 91;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.reference-link-preview path {
+  fill: none;
+  stroke: #d8dee9;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
 }
 
 @media (max-width: 1180px) {

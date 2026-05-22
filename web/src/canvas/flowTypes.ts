@@ -8,7 +8,8 @@ export type CanvasNodeKind =
   | "comfy"
   | "llm"
   | "loop"
-  | "video";
+  | "video"
+  | "group";
 
 export type CanvasNodeStatus = "idle" | "queued" | "running" | "success" | "failed" | "retrying";
 

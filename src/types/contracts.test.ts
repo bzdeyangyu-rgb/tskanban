@@ -64,7 +64,8 @@ describe("canvas snapshot contracts", () => {
         { id: "comfy_1", type: "comfy", x: 0, y: 0, width: 260, height: 150, data: {} },
         { id: "llm_1", type: "llm", x: 0, y: 0, width: 260, height: 150, data: {} },
         { id: "loop_1", type: "loop", x: 0, y: 0, width: 260, height: 150, data: {} },
-        { id: "video_1", type: "video", x: 0, y: 0, width: 260, height: 150, data: {} }
+        { id: "video_1", type: "video", x: 0, y: 0, width: 260, height: 150, data: {} },
+        { id: "group_1", type: "group", x: -20, y: -20, width: 620, height: 360, data: { childIds: ["img_1", "prompt_1"] } }
       ],
       edges: [
         { id: "e_1", from: "prompt_1", to: "text2img_1", fromHandle: "out", toHandle: "prompt" },
@@ -84,7 +85,8 @@ describe("canvas snapshot contracts", () => {
       "comfy",
       "llm",
       "loop",
-      "video"
+      "video",
+      "group"
     ]);
     expect(snapshot.nodes[0]?.data).toEqual({ assetId: "a_1" });
     expect(snapshot.edges[0]?.fromHandle).toBe("out");

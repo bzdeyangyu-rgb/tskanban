@@ -47,7 +47,7 @@ import {
   type CanvasSession,
   type FlowExecutionNode
 } from "./api/client";
-import { CanvasApp } from "./canvas/CanvasApp";
+import { ReferenceCanvas, type ReferenceCanvasHandle } from "./canvas/ReferenceCanvas";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
 import { imageFilesFromList } from "./canvas/importImages";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
@@ -224,7 +224,7 @@ const apiPageControls: Record<
     previewTitle: "在线结果",
     managementTitle: "在线任务管理",
     fields: [
-      { key: "source", label: "平台", type: "select", options: ["API Provider", "ModelScope", "远程队列"], defaultValue: "API Provider" },
+      { key: "source", label: "平台", type: "select", options: ["API Provider", "远程队列"], defaultValue: "API Provider" },
       { key: "size", label: "尺寸", type: "select", options: ["1024x1024", "1024x1536", "1536x1024"], defaultValue: "1024x1024" },
       { key: "batch", label: "批量", type: "number", defaultValue: "1" }
     ]
@@ -240,9 +240,9 @@ const apiPageControls: Record<
     ]
   }
 };
-
 export function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
+  const canvasRef = useRef<ReferenceCanvasHandle | null>(null);
   const [status, setStatus] = useState("等待画布输入");
   const [lastRunNodes, setLastRunNodes] = useState<FlowExecutionNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
@@ -281,7 +281,7 @@ export function App() {
   useEffect(() => {
     const handleLinkDragStart = (event: Event) => {
       if (!editor) {
-        setStatus("画布还在加载");
+        setStatus("鐢诲竷杩樺湪鍔犺浇");
         return;
       }
 
@@ -360,7 +360,7 @@ export function App() {
         return;
       }
       try {
-        setStatus(`正在导入 ${file.name}`);
+        setStatus(`姝ｅ湪瀵煎叆 ${file.name}`);
         const uploaded = await uploadImage(file, session?.sessionId);
         setSession(await fetchSession(uploaded.sessionId));
         editor.updateShape({
@@ -371,10 +371,10 @@ export function App() {
             url: uploaded.asset.publicUrl,
             name: file.name,
             mime: uploaded.asset.mime,
-            roleTag: "素材"
+            roleTag: "绱犳潗"
           })
         });
-        setStatus(`已导入到图片节点：${file.name}`);
+        setStatus(`宸插鍏ュ埌鍥剧墖鑺傜偣锛?{file.name}`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -539,92 +539,81 @@ export function App() {
 
   const handleAddNode = useCallback(
     (type: CanvasNodeKind) => {
-      if (!editor) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
         setStatus("画布还在加载");
         return;
       }
 
       const definition = nodeDefinition(type, providers[0]?.id);
-      addNodeToEditor(editor, definition, placementIndexRef.current);
+      canvas.addNode(definition);
       placementIndexRef.current += 1;
       setStatus(`已添加 ${definition.title}`);
     },
-    [editor, providers]
+    [providers]
   );
 
   const handleCreateLinkedNode = useCallback(
     (type: CanvasNodeKind) => {
-      if (!editor || !linkCommandMenu) {
+      const canvas = canvasRef.current;
+      if (!canvas || !linkCommandMenu) {
         return;
       }
 
       const definition = nodeDefinition(type, providers[0]?.id);
-      const nextId = addNodeToEditorAt(editor, definition, linkCommandMenu.pageX + 24, linkCommandMenu.pageY - 70);
-      connectNodes(editor, linkCommandMenu.originId, nextId);
+      canvas.addNode(definition, {
+        x: linkCommandMenu.pageX + 24,
+        y: linkCommandMenu.pageY - 70,
+        connectFrom: linkCommandMenu.originId
+      });
       placementIndexRef.current += 1;
       setLinkCommandMenu(null);
       setStatus(`已创建并连接 ${definition.title}`);
     },
-    [editor, linkCommandMenu, providers]
+    [linkCommandMenu, providers]
   );
 
   const handleConnectMode = useCallback(() => {
-    if (!editor) {
+    if (!canvasRef.current) {
       setStatus("画布还在加载");
       return;
     }
 
-    editor.setCurrentTool("arrow");
-    setStatus("连接模式：从一个节点拖出连线到另一个节点");
-  }, [editor]);
+    setStatus("连接方式：从节点右侧圆点往外拖，松开后可连接节点或创建下一步");
+  }, []);
 
   const handleGroupSelected = useCallback(() => {
-    if (!editor) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setStatus("画布还在加载");
       return;
     }
 
-    const selectedIds = editor.getSelectedShapeIds();
-    if (selectedIds.length < 2) {
-      setStatus("请先选择至少两个图片或提示词节点再分组");
+    if (!canvas.groupSelected()) {
+      setStatus("请先按 Ctrl 多选至少两个节点再分组");
       return;
     }
 
-    const groupShapes = (editor as unknown as { groupShapes?: (ids: unknown[]) => void }).groupShapes;
-    if (typeof groupShapes === "function") {
-      groupShapes.call(editor, selectedIds);
-      setStatus(`已分组 ${selectedIds.length} 个节点`);
-      return;
-    }
-
-    setStatus("当前画布内核暂不支持真实分组，后续会换成参考项目的分组模型");
-  }, [editor]);
+    setStatus("已创建分组框");
+  }, []);
 
   const handleUpdateSelectedNode = useCallback(
     (patch: Record<string, unknown>) => {
-      if (!editor || !selectedNode) {
+      const canvas = canvasRef.current;
+      if (!canvas || !selectedNode) {
         return;
       }
 
-      const shape = editor.getShape(selectedNode.id);
-      if (!shape || !isTshuabuNodeMeta(shape.meta)) {
-        return;
-      }
-
-      const nextMeta = mergeNodeData(shape.meta, patch);
-      editor.updateShape({
-        id: shape.id,
-        type: shape.type,
-        meta: nextMeta
-      });
-      setSelectedNode({ id: String(shape.id), meta: nextMeta });
+      canvas.updateSelectedNode(patch);
+      setSelectedNode({ id: selectedNode.id, meta: mergeNodeData(selectedNode.meta, patch) });
     },
-    [editor, selectedNode]
+    [selectedNode]
   );
 
   const handleImportFiles = useCallback(
     async (files: File[]) => {
-      if (!editor) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
         setStatus("画布还在加载");
         return;
       }
@@ -641,23 +630,19 @@ export function App() {
         for (const file of imageFiles) {
           const uploaded = await uploadImage(file, currentSessionId);
           currentSessionId = uploaded.sessionId;
-          addNodeToEditor(
-            editor,
-            {
-              type: "image",
-              title: "图片节点",
-              data: {
-                assetId: uploaded.asset.assetId,
-                url: uploaded.asset.publicUrl,
-                name: file.name,
-                mime: uploaded.asset.mime,
-                roleTag: "素材"
-              },
-              width: 280,
-              height: 260
+          canvas.addNode({
+            type: "image",
+            title: "图片节点",
+            data: {
+              assetId: uploaded.asset.assetId,
+              url: uploaded.asset.publicUrl,
+              name: file.name,
+              mime: uploaded.asset.mime,
+              roleTag: "素材"
             },
-            placementIndexRef.current
-          );
+            width: 280,
+            height: 260
+          });
           placementIndexRef.current += 1;
         }
 
@@ -669,41 +654,66 @@ export function App() {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     },
-    [editor, session?.sessionId]
+    [session?.sessionId]
   );
 
+  const handleImportFilesToNode = useCallback(
+    async (nodeId: string, files: File[]) => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      const [file] = imageFilesFromList(files);
+      if (!file) {
+        setStatus("没有可导入的 jpg/png 图片");
+        return;
+      }
+      try {
+        setStatus(`正在导入 ${file.name}`);
+        const uploaded = await uploadImage(file, session?.sessionId);
+        setSession(await fetchSession(uploaded.sessionId));
+        canvas.importImageNode(nodeId, {
+          assetId: uploaded.asset.assetId,
+          url: uploaded.asset.publicUrl,
+          name: file.name,
+          mime: uploaded.asset.mime,
+          roleTag: "素材"
+        });
+        setStatus(`已导入到图片节点：${file.name}`);
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [session?.sessionId]
+  );
   const handleRun = useCallback(async () => {
-    if (!editor) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setStatus("画布还在加载");
       return;
     }
 
     try {
-      ensureOutputNode(editor, placementIndexRef);
-      const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
+      const snapshot = canvas.compileSnapshot(canvasId, session?.sessionId);
       if (snapshot.nodes.length === 0) {
         setStatus("请先添加节点");
         return;
       }
 
-      updateNodeStatuses(
-        editor,
-        snapshot.nodes.map((node) => ({ nodeId: node.id, status: "running" as CanvasNodeStatus }))
-      );
+      canvas.updateNodeStatuses(snapshot.nodes.map((node) => ({ nodeId: node.id, status: "running" as CanvasNodeStatus })));
       setStatus(`提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`);
       const result = await executeCanvasFlow(snapshot);
       setLastRunNodes(result.nodes);
       const nextSession = await fetchSession(result.sessionId);
       setSession(nextSession);
-      updateNodeStatuses(
-        editor,
+      canvas.updateNodeStatuses(
         result.nodes.map((node) => ({
           nodeId: node.nodeId,
           status: node.status as CanvasNodeStatus,
           errorMessage: node.errorMessage
         }))
       );
-      addOutputsToOutputNode(editor, result.outputAssets);
+      canvas.addOutputsToOutputNode(result.outputAssets);
       setStatus(
         result.run.status === "failed"
           ? `执行失败：${result.run.errorMessage ?? "请检查失败节点"}`
@@ -712,16 +722,17 @@ export function App() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
-  }, [canvasId, editor, session?.sessionId]);
+  }, [canvasId, session?.sessionId]);
 
   const handleSaveCanvas = useCallback(async () => {
-    if (!editor) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setStatus("画布还在加载");
       return;
     }
 
     try {
-      const snapshot = compileCanvasSnapshot(editor, canvasId, session?.sessionId);
+      const snapshot = canvas.compileSnapshot(canvasId, session?.sessionId);
       const saved = await saveCanvasSnapshot(snapshot, "当前画布");
       const nextSavedAt = new Date(saved.updatedAt).toLocaleString("zh-CN");
       setSavedAt(nextSavedAt);
@@ -730,17 +741,18 @@ export function App() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
-  }, [canvasId, canvasItems, editor, persistCanvasItems, session?.sessionId]);
+  }, [canvasId, canvasItems, persistCanvasItems, session?.sessionId]);
 
   const handleLoadCanvas = useCallback(async () => {
-    if (!editor) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setStatus("画布还在加载");
       return;
     }
 
     try {
       const saved = await loadCanvasSnapshot(canvasId);
-      restoreCanvasSnapshot(editor, saved);
+      canvas.restoreSnapshot(saved);
       setSavedAt(new Date(saved.updatedAt).toLocaleString("zh-CN"));
       if (saved.sessionId) {
         setSession(await fetchSession(saved.sessionId));
@@ -749,15 +761,16 @@ export function App() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
-  }, [canvasId, editor]);
+  }, [canvasId]);
 
   const handleExportSelected = useCallback(() => {
-    if (!editor) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setStatus("画布还在加载");
       return;
     }
 
-    const asset = selectedOutputAsset(editor);
+    const asset = canvas.selectedOutputAsset();
     if (!asset) {
       setStatus("请先选择带结果的 Output 节点");
       return;
@@ -768,8 +781,7 @@ export function App() {
     link.download = `${asset.assetId}.png`;
     link.click();
     setStatus(`已导出 ${asset.assetId}`);
-  }, [editor]);
-
+  }, []);
   const handleEditorMount = useCallback(
     (mountedEditor: Editor) => {
       setEditor(mountedEditor);
@@ -826,7 +838,14 @@ export function App() {
                     onSave={handleSaveCanvas}
                   />
                   <section className="workspace studio-workspace" aria-label="画布">
-                    <CanvasApp onFiles={handleImportFiles} onMount={handleEditorMount} />
+                    <ReferenceCanvas
+                      ref={canvasRef}
+                      defaultProviderId={providers[0]?.id}
+                      onFiles={handleImportFiles}
+                      onNodeFiles={handleImportFilesToNode}
+                      onSelectionChange={setSelectedNode}
+                      onStatus={setStatus}
+                    />
                   </section>
                 </>
               )}
@@ -912,7 +931,7 @@ function StudioSidebar({
           );
         })}
       </nav>
-      <div className="studio-side-actions" aria-label="辅助操作">
+      <div className="studio-side-actions" aria-label="杈呭姪鎿嶄綔">
         <button type="button" title="黑夜模式" className={theme === "dark" ? "is-active" : ""} onClick={onThemeToggle}>
           <Sun aria-hidden="true" size={16} />
           <span>{theme === "dark" ? "黑夜模式" : "白天模式"}</span>
@@ -970,7 +989,7 @@ function StudioApiPage({
     setMessage("");
     setOutputs([]);
     if (pageId === "gpt-chat") {
-      setMessage("GPT 对话入口已保留，但当前后端还缺 chat runner；需要补 /api/chat 后才能真正发送。");
+      setMessage("GPT 对话入口已保留，当前还需要补 /api/chat 后才可真正发送。");
       return;
     }
     if (needsImage && !file) {
@@ -1074,7 +1093,7 @@ function StudioApiPage({
           <aside className="studio-preview-panel">
             <header>
               <strong>{controls.previewTitle}</strong>
-              <span>{model || "未选择模型"}</span>
+              <span>{model || "鏈€夋嫨妯″瀷"}</span>
             </header>
             {outputs.length ? (
               <div className="studio-feature-output">
@@ -1083,15 +1102,15 @@ function StudioApiPage({
                 ))}
               </div>
             ) : (
-              <div className="studio-preview-empty">{file ? file.name : "等待提交任务后显示预览"}</div>
+                <div className="studio-preview-empty">{file ? file.name : "等待提交任务后显示预览"}</div>
             )}
           </aside>
         </div>
         <div className="studio-management-panel">
           <strong>{controls.managementTitle}</strong>
-          <span>当前版本 0</span>
-          <span>批量队列 0</span>
-          <span>历史记录 0</span>
+          <span>褰撳墠鐗堟湰 0</span>
+          <span>鎵归噺闃熷垪 0</span>
+          <span>鍘嗗彶璁板綍 0</span>
         </div>
         <button type="button" className="studio-feature-primary" disabled={running} onClick={handleRunQuickTask}>
           {running ? <RefreshCw aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
@@ -1190,10 +1209,10 @@ function CanvasGate({
             <p>打开已有画布，或新建一个开始创作。</p>
           </div>
           <div className="gate-actions">
-            <button type="button" onClick={onRefresh} title="刷新">
+            <button type="button" onClick={onRefresh} title="鍒锋柊">
               <RefreshCw aria-hidden="true" size={16} />
             </button>
-            <button type="button" onClick={onClear} title="清理">
+            <button type="button" onClick={onClear} title="娓呯悊">
               <Trash2 aria-hidden="true" size={16} />
             </button>
             <button className="gate-new" type="button" onClick={onNew}>
@@ -1322,7 +1341,7 @@ function LinkCommandPopover({
         })}
       </div>
       <button className="link-command-close" type="button" onClick={onClose}>
-        取消
+        鍙栨秷
       </button>
     </div>
   );
@@ -1373,12 +1392,12 @@ function StudioDrawer({
     <aside className="studio-drawer panel" aria-label="工具抽屉">
       <header className="studio-drawer-head">
         <strong>{drawerTitle(mode)}</strong>
-        <button type="button" onClick={onClose} title="鍏抽棴">
+        <button type="button" onClick={onClose} title="关闭">
           <X aria-hidden="true" size={16} />
         </button>
       </header>
-      {mode === "assets" ? <AssetImportPanel disabled={!editor} onFiles={onFiles} /> : null}
-      {mode === "nodes" ? <NodePalette disabled={!editor} onAddNode={onAddNode} onConnectMode={onConnectMode} /> : null}
+      {mode === "assets" ? <AssetImportPanel disabled={false} onFiles={onFiles} /> : null}
+      {mode === "nodes" ? <NodePalette disabled={false} onAddNode={onAddNode} onConnectMode={onConnectMode} /> : null}
       {mode === "settings" ? (
         <>
           <ApiSettings providers={providers} onProvidersChange={onProvidersChange} />
@@ -1393,11 +1412,11 @@ function StudioDrawer({
 
 function QuickFloat({ onNewCanvas, onOpenSettings }: { onNewCanvas: () => void; onOpenSettings: () => void }) {
   return (
-    <div className="studio-quick-float" aria-label="蹇嵎鎿嶄綔">
+    <div className="studio-quick-float" aria-label="韫囶偅宓庨幙宥勭稊">
       <button type="button" onClick={onNewCanvas} title="新建画布">
         <Grid3X3 aria-hidden="true" size={16} />
       </button>
-      <button type="button" onClick={onOpenSettings} title="璁剧疆">
+      <button type="button" onClick={onOpenSettings} title="设置">
         <Settings aria-hidden="true" size={16} />
       </button>
     </div>
@@ -1476,7 +1495,7 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
 function drawerTitle(mode: Exclude<DrawerMode, null>): string {
   switch (mode) {
     case "assets":
-      return "本地素材";
+      return "鏈湴绱犳潗";
     case "nodes":
       return "节点工具";
     case "settings":
@@ -1524,7 +1543,7 @@ function upsertCanvasItem(items: CanvasGateItem[], id: string, title: string, up
 function formatGateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "刚刚";
+    return "鍒氬垰";
   }
   return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }

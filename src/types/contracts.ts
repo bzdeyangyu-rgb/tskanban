@@ -85,7 +85,8 @@ export const canvasNodeTypeSchema = z.enum([
   "comfy",
   "llm",
   "loop",
-  "video"
+  "video",
+  "group"
 ]);
 
 export const canvasNodeStatusSchema = z.enum(["idle", "queued", "running", "success", "failed", "retrying"]);

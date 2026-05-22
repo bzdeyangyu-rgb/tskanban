@@ -8,7 +8,8 @@ export type FlowNodeType =
   | "comfy"
   | "llm"
   | "loop"
-  | "video";
+  | "video"
+  | "group";
 
 export type FlowNodeStatus = "idle" | "queued" | "running" | "success" | "failed" | "retrying";
 
