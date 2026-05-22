@@ -4,7 +4,7 @@ import {
   Box,
   CircleDot,
   Clapperboard,
-  CloudLightning,
+  Dna,
   Download,
   Edit3,
   FolderOpen,
@@ -64,6 +64,8 @@ import {
 import { ApiSettings } from "./panels/ApiSettings";
 import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
+import { GeneLibraryPopover } from "./panels/GeneLibrary";
+import { createPromptGene, loadGenes, saveGenes, type GeneTemplate } from "./panels/geneLibraryModel";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunHistory } from "./panels/RunHistory";
@@ -254,6 +256,8 @@ export function App() {
   const [language, setLanguage] = useState<"zh" | "en">("zh");
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
+  const [genes, setGenes] = useState<GeneTemplate[]>(() => loadGenes(typeof window === "undefined" ? undefined : window.localStorage));
+  const [isGeneLibraryOpen, setIsGeneLibraryOpen] = useState(false);
   const placementIndexRef = useRef(0);
   const canvasId = useMemo(() => {
     const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
@@ -269,6 +273,10 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.studioTheme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    saveGenes(typeof window === "undefined" ? undefined : window.localStorage, genes);
+  }, [genes]);
 
   useEffect(() => {
     fetchProviders()
@@ -551,6 +559,38 @@ export function App() {
     [providers]
   );
 
+  const handleAddGene = useCallback(() => {
+    const source = canvasRef.current?.promptGeneSource();
+    if (!source) {
+      setStatus("请先创建或选择提示词节点");
+      return;
+    }
+
+    setGenes((current) => [createPromptGene(source.prompt, current), ...current]);
+    setStatus("已添加基因");
+  }, []);
+
+  const handleUseGene = useCallback(
+    (gene: GeneTemplate) => {
+      if (gene.type !== "prompt") {
+        setStatus("工作流基因稍后开放");
+        return;
+      }
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        setStatus("画布还在加载");
+        return;
+      }
+
+      const definition = nodeDefinition("prompt", providers[0]?.id);
+      canvas.addNode({ ...definition, data: { ...definition.data, text: gene.prompt } });
+      setStatus(`已放置 ${gene.name}`);
+      setIsGeneLibraryOpen(false);
+    },
+    [providers]
+  );
+
   const handleCreateLinkedNode = useCallback(
     (type: CanvasNodeKind) => {
       const canvas = canvasRef.current;
@@ -820,19 +860,26 @@ export function App() {
               ) : (
                 <>
                   <CanvasEditorTopbar
+                    genes={genes}
+                    isGeneLibraryOpen={isGeneLibraryOpen}
                     savedAt={savedAt}
                     status={status}
                     onAddNode={handleAddNode}
+                    onAddGene={handleAddGene}
                     onClose={() => {
                       setIsCanvasOpen(false);
                       setDrawerMode(null);
+                      setIsGeneLibraryOpen(false);
                     }}
                     onExport={handleExportSelected}
+                    onGeneLibraryClose={() => setIsGeneLibraryOpen(false)}
+                    onGeneLibraryToggle={() => setIsGeneLibraryOpen((current) => !current)}
                     onGroup={handleGroupSelected}
                     onLoad={handleLoadCanvas}
                     onOpenLog={() => setDrawerMode("history")}
                     onRun={handleRun}
                     onSave={handleSaveCanvas}
+                    onUseGene={handleUseGene}
                   />
                   <section className="workspace studio-workspace" aria-label="画布">
                     <ReferenceCanvas
@@ -1235,27 +1282,39 @@ function CanvasGate({
 }
 
 function CanvasEditorTopbar({
+  genes,
+  isGeneLibraryOpen,
   savedAt,
   status,
+  onAddGene,
   onAddNode,
   onClose,
   onExport,
+  onGeneLibraryClose,
+  onGeneLibraryToggle,
   onGroup,
   onLoad,
   onOpenLog,
   onRun,
-  onSave
+  onSave,
+  onUseGene
 }: {
+  genes: GeneTemplate[];
+  isGeneLibraryOpen: boolean;
   savedAt: string;
   status: string;
+  onAddGene: () => void;
   onAddNode: (type: CanvasNodeKind) => void;
   onClose: () => void;
   onExport: () => void;
+  onGeneLibraryClose: () => void;
+  onGeneLibraryToggle: () => void;
   onGroup: () => void;
   onLoad: () => void;
   onOpenLog: () => void;
   onRun: () => void;
   onSave: () => void;
+  onUseGene: (gene: GeneTemplate) => void;
 }) {
   return (
     <header className="studio-editor-topbar" aria-label="画布操作">
@@ -1276,7 +1335,30 @@ function CanvasEditorTopbar({
         <ToolbarButton title="提示词" label="提示词" icon={TextCursorInput} onClick={() => onAddNode("prompt")} />
         <ToolbarButton title="循环" label="循环" icon={Repeat2} onClick={() => onAddNode("loop")} />
         <ToolbarButton title="API生成" label="API生成" icon={WandSparkles} onClick={() => onAddNode("api_text2img")} />
-        <ToolbarButton title="MS生成" label="MS生成" icon={CloudLightning} onClick={() => onAddNode("api_img2img")} />
+        <div className="gene-toolbar-slot">
+          <button
+            className="tool-btn canvas-tool-btn"
+            data-testid="gene-library-toggle"
+            type="button"
+            title="基因库"
+            onClick={(event) => {
+              if (event.detail === 0) {
+                onGeneLibraryToggle();
+              }
+            }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onGeneLibraryToggle();
+            }}
+          >
+            <Dna aria-hidden="true" size={16} />
+            <span>基因库</span>
+          </button>
+          {isGeneLibraryOpen ? (
+            <GeneLibraryPopover genes={genes} onAddGene={onAddGene} onClose={onGeneLibraryClose} onUseGene={onUseGene} />
+          ) : null}
+        </div>
         <ToolbarButton title="视频生成" label="视频生成" icon={Clapperboard} onClick={() => onAddNode("video")} />
         <ToolbarButton title="Output" label="Output" icon={CircleDot} onClick={() => onAddNode("output")} />
         <ToolbarButton title="分组" label="分组" icon={Group} onClick={onGroup} />

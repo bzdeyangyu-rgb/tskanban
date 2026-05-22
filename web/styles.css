@@ -2567,7 +2567,7 @@ button {
   justify-content: flex-end;
   gap: 7px;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  overflow: visible;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2607,6 +2607,105 @@ button {
 
 .studio-canvas-toolbar .canvas-tool-btn span {
   white-space: nowrap;
+}
+
+.gene-toolbar-slot {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.gene-library-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 40;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  background: #0f1724;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.38);
+}
+
+.gene-library-popover header,
+.gene-library-popover header span {
+  display: flex;
+  align-items: center;
+}
+
+.gene-library-popover header {
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #e5e9f0;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.gene-library-popover header span {
+  gap: 7px;
+}
+
+.gene-library-popover header button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  color: #9aa6b8;
+  background: #0b111a;
+}
+
+.gene-library-list {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.gene-library-list::-webkit-scrollbar {
+  display: none;
+}
+
+.gene-chip,
+.gene-add-button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.gene-chip {
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #d8dee9;
+  background: #111827;
+}
+
+.gene-add-button {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+  border: 0;
+  color: #0b111a;
+  background: #edf2fa;
+}
+
+.gene-empty {
+  padding: 18px 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  color: #8ea3c4;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .studio-workspace {

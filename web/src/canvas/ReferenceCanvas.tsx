@@ -37,6 +37,7 @@ export type ReferenceCanvasHandle = {
   groupSelected: () => boolean;
   updateSelectedNode: (patch: Record<string, unknown>) => void;
   importImageNode: (nodeId: string, data: Record<string, unknown>) => void;
+  promptGeneSource: () => { prompt: string; sourceNodeId: string } | undefined;
   hasNodes: () => boolean;
 };
 
@@ -358,6 +359,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         }
       },
       importImageNode: (nodeId, data) => updateNodeData(nodeId, data),
+      promptGeneSource: () => promptGeneSourceFromNodes(nodes, selectedIds),
       hasNodes: () => nodes.length > 0
     }),
     [addNode, edges, nodes, selectedIds, updateNodeData, viewport]
@@ -953,6 +955,27 @@ export function deleteCanvasSelection(
     nodes: nodes.filter((node) => !selected.has(node.id)),
     edges: edges.filter((edge) => !selected.has(edge.from) && !selected.has(edge.to))
   };
+}
+
+export function promptGeneSourceFromNodes(
+  nodes: readonly Pick<CanvasNode, "id" | "type" | "data">[],
+  selectedIds: readonly string[]
+): { prompt: string; sourceNodeId: string } | undefined {
+  const selected = nodes.find((node) => selectedIds.includes(node.id) && node.type === "prompt");
+  const selectedPrompt = selected ? stringValue(selected.data.text).trim() : "";
+  if (selected && selectedPrompt) {
+    return { prompt: selectedPrompt, sourceNodeId: selected.id };
+  }
+
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    const prompt = node.type === "prompt" ? stringValue(node.data.text).trim() : "";
+    if (prompt) {
+      return { prompt, sourceNodeId: node.id };
+    }
+  }
+
+  return undefined;
 }
 
 function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
