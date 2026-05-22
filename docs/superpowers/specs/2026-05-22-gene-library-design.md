@@ -1,26 +1,26 @@
-# Gene Library Design
+# 基因库功能设计
 
-## Goal
+## 目标
 
-Replace the current `MS生成` canvas toolbar entry with `基因库`. This is not a ModelScope/MoTa generator and should not create an `api_img2img` node directly. It is a reusable template library for prompts first, and saved workflows later.
+把当前无限画布右上角工具栏里的 `MS生成` 替换为 `基因库`。它不是魔塔、ModelScope 或任何图像生成模型入口，也不应该直接创建 `api_img2img` 节点。它的定位是一个复用库：第一版复用提示词模板，后续扩展为工作流模板。
 
-## User-Facing Behavior
+## 用户行为
 
-The infinite canvas top-right toolbar shows `基因库` instead of `MS生成`. Clicking it opens a compact gene-library panel using the same visual language as the toolbar: dark surface, pill buttons, icon plus text, and tight spacing.
+无限画布右上角工具栏显示 `基因库`，位置替代现在的 `MS生成`。点击后打开一个紧凑的基因库面板。面板视觉沿用当前右上角工具栏的规划：深色底、细边框、胶囊按钮、图标加文字、间距克制。
 
-The panel contains saved gene buttons. Each prompt gene is shown as a small icon button with a short name. The bottom of the panel has a fixed `添加基因` action.
+面板中显示已经保存的基因按钮。每个提示词基因显示为一个小按钮，包含小图标和简短名称。面板底部固定一个 `添加基因` 按钮。
 
-When the user clicks `添加基因`, the app captures prompt text using this rule:
+点击 `添加基因` 时，应用按下面规则捕获提示词：
 
-1. Prefer the currently selected prompt node.
-2. If no prompt node is selected, use the newest prompt node on the canvas.
-3. If no prompt text exists, show a status message asking the user to create or select a prompt node first.
+1. 优先读取当前选中的提示词节点。
+2. 如果当前没有选中提示词节点，就读取画布中最新创建的提示词节点。
+3. 如果没有可用提示词，就显示状态提示：请先创建或选择提示词节点。
 
-When the user clicks a prompt gene, the app creates a new prompt node on the canvas with the saved prompt text. The node should appear in the current working area, using the same node creation style as other toolbar-created nodes.
+点击某个提示词基因时，应用在画布上创建一个新的提示词节点，节点内容就是该基因模板保存的提示词。节点位置沿用当前工具栏创建节点的规则，落在当前工作区域里。
 
-## Data Model
+## 数据结构
 
-The first implementation stores genes locally in browser storage. It should not require a backend migration.
+第一版把基因保存在浏览器本地存储里，不需要后端迁移。
 
 ```ts
 type GeneTemplate =
@@ -40,59 +40,60 @@ type GeneTemplate =
     };
 ```
 
-First release only exposes `prompt` genes. `workflow` genes are included in the shape so the next release can save a selected flow or whole canvas snapshot without changing storage.
+第一版只在界面上开放 `prompt` 类型基因。`workflow` 类型先放进数据结构里，为下一版“保存一套流程并一键导入”预留，不在这次实现里暴露。
 
-Storage key: `tshuabu:geneLibrary`.
+本地存储 key：`tshuabu:geneLibrary`。
 
-## Component Plan
+## 组件方案
 
-Add a `GeneLibraryPopover` near the canvas toolbar in `App.tsx`, or extract it into `web/src/panels/GeneLibrary.tsx` if the JSX grows. It receives:
+新增 `GeneLibraryPopover`。如果 JSX 很短，可以先放在 `App.tsx` 附近；如果开始变长，就拆到 `web/src/panels/GeneLibrary.tsx`。
+
+它接收：
 
 - `genes`
 - `onAddGene`
 - `onUseGene`
 - `onClose`
 
-`App.tsx` owns persistence and coordinates with `ReferenceCanvas` through the existing ref. `ReferenceCanvas` needs one new handle method for prompt capture:
+`App.tsx` 负责基因数据的读取、保存和调用画布。`ReferenceCanvas` 通过现有 ref 暴露一个新方法，用来按规则获取提示词来源：
 
 ```ts
 promptGeneSource(): { prompt: string; sourceNodeId: string } | undefined;
 ```
 
-This method follows the selected-prompt-then-newest-prompt rule. It keeps the selection logic inside the canvas where node state already lives.
+这个方法把“优先当前选中提示词，否则最新提示词”的逻辑留在画布内部，因为节点状态和选择状态本来就在 `ReferenceCanvas` 里。
 
-Using a gene calls the existing `nodeDefinition("prompt")`, overrides `data.text`, then calls `canvas.addNode`.
+使用某个基因时，调用现有 `nodeDefinition("prompt")`，覆盖 `data.text`，再通过 `canvas.addNode` 创建提示词节点。
 
-## Visual Rules
+## 视觉规则
 
-The `基因库` toolbar button should sit where `MS生成` is today. The popover should feel like part of the current reference UI:
+`基因库` 按钮占用原来 `MS生成` 的位置。弹出的面板要像当前参考 UI 的一部分，而不是新做一套风格：
 
-- Dark surface and subtle border.
-- Pill-like gene buttons matching the toolbar button rhythm.
-- No large cards.
-- Bottom `添加基因` button fixed inside the popover.
-- Empty state is short and functional: `还没有基因`.
+- 深色面板和轻边框。
+- 基因按钮使用类似右上角工具栏的胶囊节奏。
+- 不做大卡片。
+- 底部固定 `添加基因`。
+- 空状态文案保持短：`还没有基因`。
 
-## Non-Goals For First Release
+## 第一版不做
 
-- No ModelScope/MoTa behavior.
-- No ComfyUI integration.
-- No backend persistence.
-- No workflow export/import UI yet.
-- No editing, renaming, or deleting genes in the first pass unless it becomes necessary during QA.
+- 不做魔塔或 ModelScope 行为。
+- 不接 ComfyUI。
+- 不做后端持久化。
+- 不开放工作流导入导出 UI。
+- 不做编辑、重命名、删除基因，除非实现时发现没有这些会影响基本验证。
 
-## Testing
+## 验证方案
 
-Add focused tests for the pure gene helpers:
+增加基因库纯逻辑测试：
 
-- Load/save genes from local storage fallback.
-- Create a prompt gene name when no custom name exists.
-- Use selected prompt before newest prompt.
+- 本地存储读取和保存。
+- 没有自定义名称时自动生成基因名称。
+- 选中提示词优先于最新提示词。
 
-Manual browser verification:
+浏览器手动验证：
 
-- Toolbar shows `基因库` and no `MS生成`.
-- Empty popover shows `添加基因`.
-- Adding a gene from a selected prompt creates a saved gene button.
-- Clicking the gene creates a prompt node with the same text.
-
+- 右上角显示 `基因库`，不再显示 `MS生成`。
+- 空面板显示 `添加基因`。
+- 选中提示词节点后点击 `添加基因`，出现一个基因按钮。
+- 点击该基因按钮，画布上新增一个内容一致的提示词节点。
