@@ -46,7 +46,7 @@ import {
   type CanvasSession,
   type FlowExecutionNode
 } from "./api/client";
-import { ReferenceCanvas, type ReferenceCanvasHandle } from "./canvas/ReferenceCanvas";
+import { ReferenceCanvas, nodeDefinition, type ReferenceCanvasHandle } from "./canvas/ReferenceCanvas";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
 import { imageFilesFromList } from "./canvas/importImages";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
@@ -1600,42 +1600,4 @@ function ensureOutputNode(editor: Editor, placementIndexRef: MutableRefObject<nu
 
   addNodeToEditor(editor, { type: "output", title: "Output", data: {}, width: 460, height: 260 }, placementIndexRef.current);
   placementIndexRef.current += 1;
-}
-
-function nodeDefinition(type: CanvasNodeKind, providerId?: string) {
-  const providerData = providerId ? { providerId } : {};
-  switch (type) {
-    case "image":
-      return { type, title: "图片节点", data: { assetId: "" }, width: 240, height: 160 };
-    case "prompt":
-      return { type, title: "Prompt", data: { text: "输入提示词" }, width: 260, height: 130 };
-    case "api_text2img":
-      return { type, title: "文生图 API", data: { ...providerData, model: "gpt-image-2" }, width: 260, height: 150 };
-    case "api_img2img":
-      return {
-        type,
-        title: "图生图 API",
-        data: { ...providerData, model: "gpt-image-2", params: { strength: 0.55 } },
-        width: 260,
-        height: 150
-      };
-    case "api_inpaint":
-      return {
-        type,
-        title: "局部重绘 API",
-        data: { ...providerData, model: "gpt-image-2", maskAssetId: "" },
-        width: 260,
-        height: 150
-      };
-    case "loop":
-      return { type, title: "循环", data: { count: 4, prompt: "批量变化提示词" }, width: 300, height: 170 };
-    case "comfy":
-      return { type, title: "ComfyUI", data: { workflow: "", note: "当前按参考入口保留" }, width: 340, height: 210 };
-    case "video":
-      return { type, title: "视频 API", data: { ...providerData, model: "" }, width: 260, height: 150 };
-    case "output":
-      return { type, title: "Output", data: {}, width: 260, height: 170 };
-    default:
-      return { type, title: type, data: {}, width: 260, height: 150 };
-  }
 }

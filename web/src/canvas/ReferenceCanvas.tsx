@@ -843,7 +843,7 @@ function starterEdges(): CanvasEdge[] {
   ];
 }
 
-function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeDefinition {
+export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeDefinition {
   const providerData = providerId ? { providerId } : {};
   switch (type) {
     case "image":
