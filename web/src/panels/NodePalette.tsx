@@ -7,8 +7,7 @@ import {
   Paintbrush,
   Repeat2,
   ScanLine,
-  WandSparkles,
-  Workflow
+  WandSparkles
 } from "lucide-react";
 import type { CanvasNodeKind } from "../canvas/flowTypes";
 
@@ -20,7 +19,6 @@ const nodeButtons = [
   { label: "图生图", type: "api_img2img", icon: Paintbrush },
   { label: "局部重绘", type: "api_inpaint", icon: ScanLine },
   { label: "视频", type: "video", icon: Clapperboard },
-  { label: "ComfyUI", type: "comfy", icon: Workflow },
   { label: "输出", type: "output", icon: Braces }
 ] satisfies Array<{ label: string; type: CanvasNodeKind; icon: typeof Image }>;
 

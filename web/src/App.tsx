@@ -30,7 +30,6 @@ import {
   TextCursorInput,
   Trash2,
   WandSparkles,
-  Workflow,
   X,
   Zap,
   type LucideIcon
@@ -1279,7 +1278,6 @@ function CanvasEditorTopbar({
         <ToolbarButton title="API生成" label="API生成" icon={WandSparkles} onClick={() => onAddNode("api_text2img")} />
         <ToolbarButton title="MS生成" label="MS生成" icon={CloudLightning} onClick={() => onAddNode("api_img2img")} />
         <ToolbarButton title="视频生成" label="视频生成" icon={Clapperboard} onClick={() => onAddNode("video")} />
-        <ToolbarButton title="ComfyUI" label="ComfyUI" icon={Workflow} onClick={() => onAddNode("comfy")} />
         <ToolbarButton title="Output" label="Output" icon={CircleDot} onClick={() => onAddNode("output")} />
         <ToolbarButton title="分组" label="分组" icon={Group} onClick={onGroup} />
         <ToolbarButton title="日志" label="日志" icon={ListTodo} onClick={onOpenLog} />
@@ -1462,8 +1460,7 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
     nodeType === "api_text2img" ||
     nodeType === "api_img2img" ||
     nodeType === "api_inpaint" ||
-    nodeType === "video" ||
-    nodeType === "comfy"
+    nodeType === "video"
   ) {
     return [{ type: "output", label: "Output", icon: Layers }];
   }
@@ -1481,7 +1478,6 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
     { type: "api_text2img", label: "文生图", icon: Zap },
     { type: "api_img2img", label: "图生图", icon: Image },
     { type: "api_inpaint", label: "局部重绘", icon: Edit3 },
-    { type: "comfy", label: "ComfyUI", icon: Workflow },
     { type: "video", label: "视频生成", icon: Play },
     { type: "output", label: "Output", icon: Layers }
   ];
