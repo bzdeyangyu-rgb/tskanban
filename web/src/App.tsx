@@ -1206,10 +1206,10 @@ function CanvasGate({
             <p>打开已有画布，或新建一个开始创作。</p>
           </div>
           <div className="gate-actions">
-            <button type="button" onClick={onRefresh} title="鍒锋柊">
+            <button type="button" onClick={onRefresh} title="刷新">
               <RefreshCw aria-hidden="true" size={16} />
             </button>
-            <button type="button" onClick={onClear} title="娓呯悊">
+            <button type="button" onClick={onClear} title="清理">
               <Trash2 aria-hidden="true" size={16} />
             </button>
             <button className="gate-new" type="button" onClick={onNew}>
