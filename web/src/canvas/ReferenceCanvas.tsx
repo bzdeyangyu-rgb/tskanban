@@ -349,7 +349,8 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   );
 
   const handleHostPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("[data-reference-node-id], .reference-create-menu, button, input, textarea, select")) {
       return;
     }
     setCreateMenu(null);

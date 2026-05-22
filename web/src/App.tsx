@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import type { Editor } from "tldraw";
 import {
   Box,
-  Braces,
   CircleDot,
   Clapperboard,
   CloudLightning,
@@ -833,7 +832,6 @@ export function App() {
                     onGroup={handleGroupSelected}
                     onLoad={handleLoadCanvas}
                     onOpenLog={() => setDrawerMode("history")}
-                    onOpenNodes={() => setDrawerMode("nodes")}
                     onRun={handleRun}
                     onSave={handleSaveCanvas}
                   />
@@ -1246,7 +1244,6 @@ function CanvasEditorTopbar({
   onGroup,
   onLoad,
   onOpenLog,
-  onOpenNodes,
   onRun,
   onSave
 }: {
@@ -1258,7 +1255,6 @@ function CanvasEditorTopbar({
   onGroup: () => void;
   onLoad: () => void;
   onOpenLog: () => void;
-  onOpenNodes: () => void;
   onRun: () => void;
   onSave: () => void;
 }) {
@@ -1286,7 +1282,6 @@ function CanvasEditorTopbar({
         <ToolbarButton title="ComfyUI" label="ComfyUI" icon={Workflow} onClick={() => onAddNode("comfy")} />
         <ToolbarButton title="Output" label="Output" icon={CircleDot} onClick={() => onAddNode("output")} />
         <ToolbarButton title="分组" label="分组" icon={Group} onClick={onGroup} />
-        <ToolbarButton title="节点面板" label="节点" icon={Braces} onClick={onOpenNodes} />
         <ToolbarButton title="日志" label="日志" icon={ListTodo} onClick={onOpenLog} />
       </div>
     </header>
