@@ -2620,7 +2620,7 @@ button {
   top: calc(100% + 12px);
   right: 0;
   z-index: 40;
-  width: 260px;
+  width: 312px;
   padding: 12px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 18px;
@@ -2659,6 +2659,7 @@ button {
 
 .gene-library-list {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   max-height: 220px;
   overflow: auto;
@@ -2669,24 +2670,73 @@ button {
   display: none;
 }
 
+.gene-tile {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 15px;
+  background: #111827;
+}
+
 .gene-chip,
-.gene-add-button {
-  min-height: 38px;
+.gene-add-button,
+.gene-tile-actions button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 999px;
   font: inherit;
-  font-size: 12px;
   font-weight: 900;
   cursor: pointer;
 }
 
 .gene-chip {
-  padding: 0 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  min-width: 0;
+  min-height: 46px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px;
+  border: 0;
+  border-radius: 12px;
   color: #d8dee9;
-  background: #111827;
+  background: transparent;
+  font-size: 11px;
+}
+
+.gene-chip span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gene-tile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.gene-tile-actions button {
+  height: 24px;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: #9aa6b8;
+  background: #0b111a;
+}
+
+.gene-tile-actions button:hover,
+.gene-chip:hover {
+  color: #eef3fb;
+  background: rgba(216, 222, 233, 0.08);
+}
+
+.gene-add-button {
+  min-height: 38px;
+  gap: 8px;
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .gene-add-button {
@@ -2699,6 +2749,7 @@ button {
 }
 
 .gene-empty {
+  grid-column: 1 / -1;
   padding: 18px 12px;
   border: 1px dashed rgba(148, 163, 184, 0.22);
   border-radius: 14px;

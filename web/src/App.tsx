@@ -591,6 +591,24 @@ export function App() {
     [providers]
   );
 
+  const handleRenameGene = useCallback((gene: GeneTemplate) => {
+    const nextName = window.prompt("重命名基因", gene.name)?.trim();
+    if (!nextName) {
+      return;
+    }
+    setGenes((current) => current.map((item) => (item.id === gene.id ? { ...item, name: nextName } : item)));
+    setStatus(`已重命名为 ${nextName}`);
+  }, []);
+
+  const handleDeleteGene = useCallback((gene: GeneTemplate) => {
+    const confirmed = window.confirm(`删除 ${gene.name}？`);
+    if (!confirmed) {
+      return;
+    }
+    setGenes((current) => current.filter((item) => item.id !== gene.id));
+    setStatus(`已删除 ${gene.name}`);
+  }, []);
+
   const handleCreateLinkedNode = useCallback(
     (type: CanvasNodeKind) => {
       const canvas = canvasRef.current;
@@ -874,9 +892,11 @@ export function App() {
                     onExport={handleExportSelected}
                     onGeneLibraryClose={() => setIsGeneLibraryOpen(false)}
                     onGeneLibraryToggle={() => setIsGeneLibraryOpen((current) => !current)}
+                    onDeleteGene={handleDeleteGene}
                     onGroup={handleGroupSelected}
                     onLoad={handleLoadCanvas}
                     onOpenLog={() => setDrawerMode("history")}
+                    onRenameGene={handleRenameGene}
                     onRun={handleRun}
                     onSave={handleSaveCanvas}
                     onUseGene={handleUseGene}
@@ -1292,9 +1312,11 @@ function CanvasEditorTopbar({
   onExport,
   onGeneLibraryClose,
   onGeneLibraryToggle,
+  onDeleteGene,
   onGroup,
   onLoad,
   onOpenLog,
+  onRenameGene,
   onRun,
   onSave,
   onUseGene
@@ -1309,9 +1331,11 @@ function CanvasEditorTopbar({
   onExport: () => void;
   onGeneLibraryClose: () => void;
   onGeneLibraryToggle: () => void;
+  onDeleteGene: (gene: GeneTemplate) => void;
   onGroup: () => void;
   onLoad: () => void;
   onOpenLog: () => void;
+  onRenameGene: (gene: GeneTemplate) => void;
   onRun: () => void;
   onSave: () => void;
   onUseGene: (gene: GeneTemplate) => void;
@@ -1356,7 +1380,14 @@ function CanvasEditorTopbar({
             <span>基因库</span>
           </button>
           {isGeneLibraryOpen ? (
-            <GeneLibraryPopover genes={genes} onAddGene={onAddGene} onClose={onGeneLibraryClose} onUseGene={onUseGene} />
+            <GeneLibraryPopover
+              genes={genes}
+              onAddGene={onAddGene}
+              onClose={onGeneLibraryClose}
+              onDeleteGene={onDeleteGene}
+              onRenameGene={onRenameGene}
+              onUseGene={onUseGene}
+            />
           ) : null}
         </div>
         <ToolbarButton title="视频生成" label="视频生成" icon={Clapperboard} onClick={() => onAddNode("video")} />
