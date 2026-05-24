@@ -573,8 +573,15 @@ function ReferenceNodeCard({
       data-reference-node-id={node.id}
       style={style}
       onPointerDown={onSelect}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => {
+        if (node.type === "image") {
+          event.preventDefault();
+        }
+      }}
       onDrop={(event) => {
+        if (node.type !== "image") {
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         onFiles(Array.from(event.dataTransfer.files));
@@ -604,9 +611,24 @@ function renderNodeBody(
   if (node.type === "image") {
     const url = stringValue(node.data.url);
     return (
-      <label className="reference-image-drop">
+      <label
+        className={`reference-image-drop ${url ? "has-image" : ""}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
         {url ? <img src={url} alt={stringValue(node.data.name) || "image"} /> : <span>点击或拖入图片</span>}
-        <input type="file" accept="image/*" onChange={(event) => onFiles(Array.from(event.target.files ?? []))} />
+        {url ? <em>{stringValue(node.data.name) || "已导入图片"}</em> : null}
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          aria-label="导入图片"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            onFiles(Array.from(event.target.files ?? []));
+            event.currentTarget.value = "";
+          }}
+        />
       </label>
     );
   }
@@ -615,7 +637,13 @@ function renderNodeBody(
     const value = stringValue(node.data.text);
     return (
       <label className="reference-prompt-field">
-        <textarea value={value} placeholder="输入提示词" onChange={(event) => onData(node.id, { text: event.target.value })} />
+        <textarea
+          aria-label="提示词内容"
+          value={value}
+          placeholder="输入提示词"
+          onPointerDown={(event) => event.stopPropagation()}
+          onChange={(event) => onData(node.id, { text: event.target.value })}
+        />
         <small>{value.length} 字</small>
       </label>
     );

@@ -3239,6 +3239,23 @@ button {
   background: #0b111a;
 }
 
+.reference-image-drop em {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  padding: 6px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: #e5e9f0;
+  background: rgba(11, 17, 26, 0.78);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reference-image-drop input {
   position: absolute;
   inset: 0;

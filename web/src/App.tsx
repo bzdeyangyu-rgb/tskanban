@@ -706,7 +706,7 @@ export function App() {
 
       const imageFiles = imageFilesFromList(files);
       if (imageFiles.length === 0) {
-        setStatus("没有可导入的 jpg/png 图片");
+        setStatus("没有可导入的 jpg/png/webp 图片");
         return;
       }
 
@@ -751,7 +751,7 @@ export function App() {
       }
       const [file] = imageFilesFromList(files);
       if (!file) {
-        setStatus("没有可导入的 jpg/png 图片");
+        setStatus("没有可导入的 jpg/png/webp 图片");
         return;
       }
       try {
