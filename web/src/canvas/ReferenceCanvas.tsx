@@ -289,7 +289,15 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         setSelectedIds(snapshot.selectedNodeId ? [snapshot.selectedNodeId] : []);
       },
       importWorkflowGene: (snapshot) => {
-        const result = importWorkflowGeneToCanvas(nodes, edges, snapshot, `gene_${Date.now().toString(36)}_${nodeCounterRef.current++}`);
+        const rect = hostRef.current?.getBoundingClientRect();
+        const targetCenter = {
+          x: ((rect?.width ?? 1200) / 2 - viewport.x) / viewport.zoom,
+          y: ((rect?.height ?? 800) / 2 - viewport.y) / viewport.zoom
+        };
+        const result = importWorkflowGeneToCanvas(nodes, edges, snapshot, `gene_${Date.now().toString(36)}_${nodeCounterRef.current++}`, {
+          targetCenter,
+          avoidOverlap: true
+        });
         setNodes(result.nodes);
         setEdges(result.edges);
         setSelectedIds(result.importedIds);
@@ -1024,17 +1032,18 @@ export function importWorkflowGeneToCanvas(
   currentEdges: readonly CanvasEdge[],
   snapshot: CanvasSnapshot,
   idPrefix: string,
-  offset = 80
+  options: number | { targetCenter?: { x: number; y: number }; avoidOverlap?: boolean; offset?: number } = 80
 ): { nodes: CanvasNode[]; edges: CanvasEdge[]; importedIds: string[] } {
   const idMap = new Map<string, string>();
+  const placement = workflowPlacementOffset(snapshot.nodes, currentNodes, options);
   const importedNodes = snapshot.nodes.map((node, index) => {
     const id = `${idPrefix}_node_${index}`;
     idMap.set(node.id, id);
     return {
       ...node,
       id,
-      x: node.x + offset,
-      y: node.y + offset,
+      x: node.x + placement.x,
+      y: node.y + placement.y,
       data: { ...node.data },
       status: "idle" as CanvasNodeStatus
     };
@@ -1054,6 +1063,54 @@ export function importWorkflowGeneToCanvas(
     edges: [...currentEdges, ...importedEdges],
     importedIds: importedNodes.map((node) => node.id)
   };
+}
+
+function workflowPlacementOffset(
+  sourceNodes: readonly CanvasNode[],
+  currentNodes: readonly CanvasNode[],
+  options: number | { targetCenter?: { x: number; y: number }; avoidOverlap?: boolean; offset?: number }
+): { x: number; y: number } {
+  if (typeof options === "number") {
+    return { x: options, y: options };
+  }
+
+  const bounds = nodeBounds(sourceNodes);
+  const fallbackOffset = options.offset ?? 80;
+  let placement = options.targetCenter
+    ? {
+        x: options.targetCenter.x - (bounds.left + bounds.width / 2),
+        y: options.targetCenter.y - (bounds.top + bounds.height / 2)
+      }
+    : { x: fallbackOffset, y: fallbackOffset };
+
+  if (!options.avoidOverlap) {
+    return placement;
+  }
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const candidate = sourceNodes.map((node) => ({ ...node, x: node.x + placement.x, y: node.y + placement.y }));
+    if (!candidate.some((node) => currentNodes.some((existing) => nodesOverlap(node, existing)))) {
+      return placement;
+    }
+    placement = { x: placement.x + 48, y: placement.y + 48 };
+  }
+
+  return placement;
+}
+
+function nodeBounds(nodes: readonly CanvasNode[]): { left: number; top: number; width: number; height: number } {
+  if (nodes.length === 0) {
+    return { left: 0, top: 0, width: 0, height: 0 };
+  }
+  const left = Math.min(...nodes.map((node) => node.x));
+  const top = Math.min(...nodes.map((node) => node.y));
+  const right = Math.max(...nodes.map((node) => node.x + node.width));
+  const bottom = Math.max(...nodes.map((node) => node.y + node.height));
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+function nodesOverlap(a: Pick<CanvasNode, "x" | "y" | "width" | "height">, b: Pick<CanvasNode, "x" | "y" | "width" | "height">): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {

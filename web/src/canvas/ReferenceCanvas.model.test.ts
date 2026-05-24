@@ -85,4 +85,43 @@ describe("ReferenceCanvas model helpers", () => {
     expect(result.edges).toEqual([{ id: "gene_new_edge_0", from: "gene_new_node_0", to: "gene_new_node_1" }]);
     expect(result.importedIds).toEqual(["gene_new_node_0", "gene_new_node_1"]);
   });
+
+  it("centers imported workflow genes around the requested point", () => {
+    const result = importWorkflowGeneToCanvas(
+      [],
+      [],
+      {
+        canvasId: "gene",
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [
+          { id: "a", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} },
+          { id: "b", type: "api_text2img", x: 200, y: 0, width: 100, height: 100, data: {} }
+        ],
+        edges: []
+      },
+      "centered",
+      { targetCenter: { x: 500, y: 300 } }
+    );
+
+    expect(result.nodes[0]).toMatchObject({ x: 350, y: 250 });
+    expect(result.nodes[1]).toMatchObject({ x: 550, y: 250 });
+  });
+
+  it("shifts imported workflow genes away from overlapping nodes", () => {
+    const result = importWorkflowGeneToCanvas(
+      [{ id: "existing", type: "prompt", x: 350, y: 250, width: 100, height: 100, data: {} }],
+      [],
+      {
+        canvasId: "gene",
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [{ id: "a", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} }],
+        edges: []
+      },
+      "avoid",
+      { targetCenter: { x: 400, y: 300 }, avoidOverlap: true }
+    );
+
+    expect(result.nodes[1].x).toBeGreaterThan(350);
+    expect(result.nodes[1].y).toBeGreaterThan(250);
+  });
 });
