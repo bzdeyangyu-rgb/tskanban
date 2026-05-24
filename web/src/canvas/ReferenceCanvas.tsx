@@ -27,6 +27,8 @@ import {
 import type { CanvasEdge, CanvasNode, CanvasNodeKind, CanvasNodeStatus, CanvasSnapshot } from "./flowTypes";
 import type { NodeDefinition, TshuabuNodeMeta } from "./shapeUtils";
 
+export type WorkflowGeneScope = "selection" | "selectionWithOutputs" | "canvas";
+
 export type ReferenceCanvasHandle = {
   addNode: (definition: NodeDefinition, options?: { x?: number; y?: number; connectFrom?: string }) => string;
   compileSnapshot: (canvasId: string, sessionId?: string) => CanvasSnapshot;
@@ -39,7 +41,7 @@ export type ReferenceCanvasHandle = {
   updateSelectedNode: (patch: Record<string, unknown>) => void;
   importImageNode: (nodeId: string, data: Record<string, unknown>) => void;
   promptGeneSource: () => { prompt: string; sourceNodeId: string } | undefined;
-  workflowGeneSource: () => { snapshot: CanvasSnapshot; nodeCount: number } | undefined;
+  workflowGeneSource: (scope?: WorkflowGeneScope) => { snapshot: CanvasSnapshot; nodeCount: number } | undefined;
   hasNodes: () => boolean;
 };
 
@@ -377,7 +379,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       },
       importImageNode: (nodeId, data) => updateNodeData(nodeId, data),
       promptGeneSource: () => promptGeneSourceFromNodes(nodes, selectedIds),
-      workflowGeneSource: () => workflowGeneSourceFromSelection(nodes, edges, selectedIds),
+      workflowGeneSource: (scope) => workflowGeneSourceFromSelection(nodes, edges, selectedIds, scope),
       hasNodes: () => nodes.length > 0
     }),
     [addNode, edges, nodes, selectedIds, updateNodeData, viewport]
@@ -999,13 +1001,10 @@ export function promptGeneSourceFromNodes(
 export function workflowGeneSourceFromSelection(
   nodes: readonly CanvasNode[],
   edges: readonly CanvasEdge[],
-  selectedIds: readonly string[]
+  selectedIds: readonly string[],
+  scope: WorkflowGeneScope = "selection"
 ): { snapshot: CanvasSnapshot; nodeCount: number } | undefined {
-  if (selectedIds.length < 2) {
-    return undefined;
-  }
-
-  const selected = new Set(selectedIds);
+  const selected = workflowGeneNodeIds(nodes, edges, selectedIds, scope);
   const pickedNodes = nodes.filter((node) => selected.has(node.id)).map((node) => ({ ...node, data: { ...node.data }, status: "idle" as CanvasNodeStatus }));
   if (pickedNodes.length < 2) {
     return undefined;
@@ -1025,6 +1024,38 @@ export function workflowGeneSourceFromSelection(
       updatedAt: new Date().toISOString()
     }
   };
+}
+
+function workflowGeneNodeIds(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  selectedIds: readonly string[],
+  scope: WorkflowGeneScope
+): Set<string> {
+  if (scope === "canvas") {
+    return new Set(nodes.map((node) => node.id));
+  }
+
+  if (selectedIds.length < 2) {
+    return new Set();
+  }
+
+  const selected = new Set(selectedIds);
+  if (scope !== "selectionWithOutputs") {
+    return selected;
+  }
+
+  edges.forEach((edge) => {
+    if (!selected.has(edge.from)) {
+      return;
+    }
+    const target = nodes.find((node) => node.id === edge.to);
+    if (target?.type === "output") {
+      selected.add(target.id);
+    }
+  });
+
+  return selected;
 }
 
 export function importWorkflowGeneToCanvas(

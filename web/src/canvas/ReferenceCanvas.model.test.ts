@@ -64,6 +64,49 @@ describe("ReferenceCanvas model helpers", () => {
     expect(result?.snapshot.edges).toEqual([{ id: "e1", from: "p", to: "g" }]);
   });
 
+  it("can include connected output nodes when saving a workflow gene", () => {
+    const result = workflowGeneSourceFromSelection(
+      [
+        { id: "p", type: "prompt", x: 10, y: 20, width: 100, height: 100, data: { text: "提示词" } },
+        { id: "g", type: "api_text2img", x: 150, y: 20, width: 120, height: 120, data: { model: "m" } },
+        { id: "o", type: "output", x: 310, y: 20, width: 120, height: 120, data: {} },
+        { id: "other", type: "prompt", x: 470, y: 20, width: 120, height: 120, data: {} }
+      ],
+      [
+        { id: "e1", from: "p", to: "g" },
+        { id: "e2", from: "g", to: "o" },
+        { id: "e3", from: "o", to: "other" }
+      ],
+      ["p", "g"],
+      "selectionWithOutputs"
+    );
+
+    expect(result?.snapshot.nodes.map((node) => node.id)).toEqual(["p", "g", "o"]);
+    expect(result?.snapshot.edges).toEqual([
+      { id: "e1", from: "p", to: "g" },
+      { id: "e2", from: "g", to: "o" }
+    ]);
+  });
+
+  it("can save the whole canvas as a workflow gene", () => {
+    const result = workflowGeneSourceFromSelection(
+      [
+        { id: "p", type: "prompt", x: 10, y: 20, width: 100, height: 100, data: { text: "提示词" } },
+        { id: "g", type: "api_text2img", x: 150, y: 20, width: 120, height: 120, data: { model: "m" } },
+        { id: "o", type: "output", x: 310, y: 20, width: 120, height: 120, data: {} }
+      ],
+      [
+        { id: "e1", from: "p", to: "g" },
+        { id: "e2", from: "g", to: "o" }
+      ],
+      [],
+      "canvas"
+    );
+
+    expect(result?.snapshot.nodes.map((node) => node.id)).toEqual(["p", "g", "o"]);
+    expect(result?.snapshot.edges).toHaveLength(2);
+  });
+
   it("imports workflow genes with fresh node and edge ids", () => {
     const result = importWorkflowGeneToCanvas(
       [{ id: "existing", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} }],

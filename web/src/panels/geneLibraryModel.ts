@@ -47,11 +47,16 @@ export function saveGenes(storage: GeneStorage | undefined, genes: GeneTemplate[
   storage.setItem(storageKey, JSON.stringify(genes));
 }
 
-export function createPromptGene(prompt: string, existing: GeneTemplate[], createdAt = new Date().toISOString()): PromptGeneTemplate {
+export function createPromptGene(
+  prompt: string,
+  existing: GeneTemplate[],
+  createdAt = new Date().toISOString(),
+  name?: string
+): PromptGeneTemplate {
   return {
     id: `gene_${Date.now().toString(36)}_${existing.length}`,
     type: "prompt",
-    name: `基因 ${nextGeneNumber(existing)}`,
+    name: normalizedGeneName(name) || nextPromptGeneName(existing),
     prompt,
     createdAt
   };
@@ -60,24 +65,33 @@ export function createPromptGene(prompt: string, existing: GeneTemplate[], creat
 export function createWorkflowGene(
   snapshot: CanvasSnapshot,
   existing: GeneTemplate[],
-  createdAt = new Date().toISOString()
+  createdAt = new Date().toISOString(),
+  name?: string
 ): WorkflowGeneTemplate {
   return {
     id: `gene_${Date.now().toString(36)}_${existing.length}`,
     type: "workflow",
-    name: `流程基因 ${nextWorkflowNumber(existing)}`,
+    name: normalizedGeneName(name) || nextWorkflowGeneName(existing),
     snapshot,
     nodeCount: snapshot.nodes.length,
     createdAt
   };
 }
 
-function nextGeneNumber(existing: GeneTemplate[]): number {
-  return existing.filter((gene) => gene.type === "prompt").length + 1;
+export function nextPromptGeneName(existing: GeneTemplate[]): string {
+  return `基因 ${nextGeneNumber(existing, "prompt")}`;
 }
 
-function nextWorkflowNumber(existing: GeneTemplate[]): number {
-  return existing.filter((gene) => gene.type === "workflow").length + 1;
+export function nextWorkflowGeneName(existing: GeneTemplate[]): string {
+  return `流程基因 ${nextGeneNumber(existing, "workflow")}`;
+}
+
+function nextGeneNumber(existing: GeneTemplate[], type: GeneTemplate["type"]): number {
+  return existing.filter((gene) => gene.type === type).length + 1;
+}
+
+function normalizedGeneName(name: string | undefined): string {
+  return name?.trim() ?? "";
 }
 
 function isGeneTemplate(value: unknown): value is GeneTemplate {

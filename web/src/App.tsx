@@ -45,7 +45,7 @@ import {
   type CanvasSession,
   type FlowExecutionNode
 } from "./api/client";
-import { ReferenceCanvas, nodeDefinition, type ReferenceCanvasHandle } from "./canvas/ReferenceCanvas";
+import { ReferenceCanvas, nodeDefinition, type ReferenceCanvasHandle, type WorkflowGeneScope } from "./canvas/ReferenceCanvas";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
 import { imageFilesFromList } from "./canvas/importImages";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
@@ -65,7 +65,15 @@ import { ApiSettings } from "./panels/ApiSettings";
 import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { GeneLibraryPopover } from "./panels/GeneLibrary";
-import { createPromptGene, createWorkflowGene, loadGenes, saveGenes, type GeneTemplate } from "./panels/geneLibraryModel";
+import {
+  createPromptGene,
+  createWorkflowGene,
+  loadGenes,
+  nextPromptGeneName,
+  nextWorkflowGeneName,
+  saveGenes,
+  type GeneTemplate
+} from "./panels/geneLibraryModel";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunHistory } from "./panels/RunHistory";
@@ -258,6 +266,7 @@ export function App() {
   const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
   const [genes, setGenes] = useState<GeneTemplate[]>(() => loadGenes(typeof window === "undefined" ? undefined : window.localStorage));
   const [isGeneLibraryOpen, setIsGeneLibraryOpen] = useState(false);
+  const [geneScope, setGeneScope] = useState<WorkflowGeneScope>("selection");
   const placementIndexRef = useRef(0);
   const canvasId = useMemo(() => {
     const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
@@ -560,10 +569,16 @@ export function App() {
   );
 
   const handleAddGene = useCallback(() => {
-    const workflowSource = canvasRef.current?.workflowGeneSource();
+    const workflowSource = canvasRef.current?.workflowGeneSource(geneScope);
     if (workflowSource) {
-      setGenes((current) => [createWorkflowGene(workflowSource.snapshot, current), ...current]);
-      setStatus(`已添加流程基因（${workflowSource.nodeCount} 个节点）`);
+      const name = window.prompt("命名流程基因", nextWorkflowGeneName(genes));
+      if (name === null) {
+        setStatus("已取消添加基因");
+        return;
+      }
+      const gene = createWorkflowGene(workflowSource.snapshot, genes, new Date().toISOString(), name);
+      setGenes((current) => [gene, ...current]);
+      setStatus(`已添加 ${gene.name}（${workflowSource.nodeCount} 个节点）`);
       return;
     }
 
@@ -573,9 +588,15 @@ export function App() {
       return;
     }
 
-    setGenes((current) => [createPromptGene(source.prompt, current), ...current]);
-    setStatus("已添加基因");
-  }, []);
+    const name = window.prompt("命名基因", nextPromptGeneName(genes));
+    if (name === null) {
+      setStatus("已取消添加基因");
+      return;
+    }
+    const gene = createPromptGene(source.prompt, genes, new Date().toISOString(), name);
+    setGenes((current) => [gene, ...current]);
+    setStatus(`已添加 ${gene.name}`);
+  }, [geneScope, genes]);
 
   const handleUseGene = useCallback(
     (gene: GeneTemplate) => {
@@ -887,6 +908,7 @@ export function App() {
               ) : (
                 <>
                   <CanvasEditorTopbar
+                    geneScope={geneScope}
                     genes={genes}
                     isGeneLibraryOpen={isGeneLibraryOpen}
                     savedAt={savedAt}
@@ -901,6 +923,7 @@ export function App() {
                     onExport={handleExportSelected}
                     onGeneLibraryClose={() => setIsGeneLibraryOpen(false)}
                     onGeneLibraryToggle={() => setIsGeneLibraryOpen((current) => !current)}
+                    onGeneScopeChange={setGeneScope}
                     onDeleteGene={handleDeleteGene}
                     onGroup={handleGroupSelected}
                     onLoad={handleLoadCanvas}
@@ -1311,6 +1334,7 @@ function CanvasGate({
 }
 
 function CanvasEditorTopbar({
+  geneScope,
   genes,
   isGeneLibraryOpen,
   savedAt,
@@ -1321,6 +1345,7 @@ function CanvasEditorTopbar({
   onExport,
   onGeneLibraryClose,
   onGeneLibraryToggle,
+  onGeneScopeChange,
   onDeleteGene,
   onGroup,
   onLoad,
@@ -1330,6 +1355,7 @@ function CanvasEditorTopbar({
   onSave,
   onUseGene
 }: {
+  geneScope: WorkflowGeneScope;
   genes: GeneTemplate[];
   isGeneLibraryOpen: boolean;
   savedAt: string;
@@ -1340,6 +1366,7 @@ function CanvasEditorTopbar({
   onExport: () => void;
   onGeneLibraryClose: () => void;
   onGeneLibraryToggle: () => void;
+  onGeneScopeChange: (scope: WorkflowGeneScope) => void;
   onDeleteGene: (gene: GeneTemplate) => void;
   onGroup: () => void;
   onLoad: () => void;
@@ -1390,10 +1417,12 @@ function CanvasEditorTopbar({
           </button>
           {isGeneLibraryOpen ? (
             <GeneLibraryPopover
+              geneScope={geneScope}
               genes={genes}
               onAddGene={onAddGene}
               onClose={onGeneLibraryClose}
               onDeleteGene={onDeleteGene}
+              onGeneScopeChange={onGeneScopeChange}
               onRenameGene={onRenameGene}
               onUseGene={onUseGene}
             />

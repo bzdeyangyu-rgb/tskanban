@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createPromptGene, createWorkflowGene, loadGenes, saveGenes, storageKey, type GeneStorage } from "./geneLibraryModel";
+import {
+  createPromptGene,
+  createWorkflowGene,
+  loadGenes,
+  nextPromptGeneName,
+  nextWorkflowGeneName,
+  saveGenes,
+  storageKey,
+  type GeneStorage
+} from "./geneLibraryModel";
 
 describe("geneLibraryModel", () => {
   it("loads an empty list when storage is missing or invalid", () => {
@@ -36,6 +45,14 @@ describe("geneLibraryModel", () => {
     expect(second.type).toBe("prompt");
   });
 
+  it("uses trimmed custom names and falls back to generated names", () => {
+    const promptGene = createPromptGene("霓虹雨夜", [], "2026-05-22T09:00:00.000Z", "  城市夜景  ");
+    const fallbackGene = createPromptGene("霓虹雨夜", [promptGene], "2026-05-22T09:01:00.000Z", "   ");
+
+    expect(promptGene.name).toBe("城市夜景");
+    expect(fallbackGene.name).toBe("基因 2");
+  });
+
   it("creates workflow genes with node counts", () => {
     const gene = createWorkflowGene(
       {
@@ -54,5 +71,25 @@ describe("geneLibraryModel", () => {
     expect(gene.type).toBe("workflow");
     expect(gene.name).toBe("流程基因 1");
     expect(gene.nodeCount).toBe(2);
+  });
+
+  it("exposes default names for save prompts", () => {
+    const promptGene = createPromptGene("霓虹雨夜", [], "2026-05-22T09:00:00.000Z");
+    const workflowGene = createWorkflowGene(
+      {
+        canvasId: "gene",
+        nodes: [
+          { id: "a", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} },
+          { id: "b", type: "api_text2img", x: 130, y: 0, width: 100, height: 100, data: {} }
+        ],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 }
+      },
+      [promptGene],
+      "2026-05-22T09:02:00.000Z"
+    );
+
+    expect(nextPromptGeneName([promptGene, workflowGene])).toBe("基因 2");
+    expect(nextWorkflowGeneName([promptGene, workflowGene])).toBe("流程基因 2");
   });
 });

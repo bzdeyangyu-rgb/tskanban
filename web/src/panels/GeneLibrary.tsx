@@ -1,18 +1,23 @@
-import { Dna, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Dna, GitBranch, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import type { WorkflowGeneScope } from "../canvas/ReferenceCanvas";
 import type { GeneTemplate } from "./geneLibraryModel";
 
 export function GeneLibraryPopover({
+  geneScope,
   genes,
   onAddGene,
   onClose,
   onDeleteGene,
+  onGeneScopeChange,
   onRenameGene,
   onUseGene
 }: {
+  geneScope: WorkflowGeneScope;
   genes: GeneTemplate[];
   onAddGene: () => void;
   onClose: () => void;
   onDeleteGene: (gene: GeneTemplate) => void;
+  onGeneScopeChange: (scope: WorkflowGeneScope) => void;
   onRenameGene: (gene: GeneTemplate) => void;
   onUseGene: (gene: GeneTemplate) => void;
 }) {
@@ -27,18 +32,31 @@ export function GeneLibraryPopover({
           <X aria-hidden="true" size={15} />
         </button>
       </header>
+      <div className="gene-scope-tabs" aria-label="流程保存范围">
+        {geneScopeOptions.map((option) => (
+          <button
+            type="button"
+            key={option.scope}
+            className={geneScope === option.scope ? "is-active" : ""}
+            onClick={() => onGeneScopeChange(option.scope)}
+            title={option.title}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       <div className="gene-library-list">
         {genes.length ? (
           genes.map((gene) => (
-            <div className="gene-tile" key={gene.id}>
+            <div className={`gene-tile is-${gene.type}`} key={gene.id}>
               <button
                 type="button"
-                className="gene-chip"
+                className={`gene-chip is-${gene.type}`}
                 data-testid="gene-chip"
                 onClick={() => onUseGene(gene)}
                 title={gene.type === "prompt" ? gene.prompt : `${gene.nodeCount} 个节点`}
               >
-                <Sparkles aria-hidden="true" size={15} />
+                {gene.type === "prompt" ? <Sparkles aria-hidden="true" size={15} /> : <GitBranch aria-hidden="true" size={15} />}
                 <span>{gene.name}</span>
                 {gene.type === "workflow" ? <small>{gene.nodeCount} 节点</small> : null}
               </button>
@@ -63,3 +81,9 @@ export function GeneLibraryPopover({
     </div>
   );
 }
+
+const geneScopeOptions: Array<{ scope: WorkflowGeneScope; label: string; title: string }> = [
+  { scope: "selection", label: "选中", title: "只保存当前选中的节点和内部连线" },
+  { scope: "selectionWithOutputs", label: "加输出", title: "保存选中节点，并带上直接连接的 Output 节点" },
+  { scope: "canvas", label: "全画布", title: "保存当前画布上的所有节点和连线" }
+];
