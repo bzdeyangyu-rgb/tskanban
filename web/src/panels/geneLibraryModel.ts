@@ -15,6 +15,7 @@ export type WorkflowGeneTemplate = {
   type: "workflow";
   name: string;
   snapshot: CanvasSnapshot;
+  nodeCount: number;
   createdAt: string;
 };
 
@@ -56,8 +57,27 @@ export function createPromptGene(prompt: string, existing: GeneTemplate[], creat
   };
 }
 
+export function createWorkflowGene(
+  snapshot: CanvasSnapshot,
+  existing: GeneTemplate[],
+  createdAt = new Date().toISOString()
+): WorkflowGeneTemplate {
+  return {
+    id: `gene_${Date.now().toString(36)}_${existing.length}`,
+    type: "workflow",
+    name: `流程基因 ${nextWorkflowNumber(existing)}`,
+    snapshot,
+    nodeCount: snapshot.nodes.length,
+    createdAt
+  };
+}
+
 function nextGeneNumber(existing: GeneTemplate[]): number {
   return existing.filter((gene) => gene.type === "prompt").length + 1;
+}
+
+function nextWorkflowNumber(existing: GeneTemplate[]): number {
+  return existing.filter((gene) => gene.type === "workflow").length + 1;
 }
 
 function isGeneTemplate(value: unknown): value is GeneTemplate {
@@ -70,7 +90,12 @@ function isGeneTemplate(value: unknown): value is GeneTemplate {
     return typeof candidate.id === "string" && typeof candidate.name === "string" && typeof candidate.prompt === "string";
   }
   if (candidate.type === "workflow") {
-    return typeof candidate.id === "string" && typeof candidate.name === "string" && typeof candidate.createdAt === "string";
+    return (
+      typeof candidate.id === "string" &&
+      typeof candidate.name === "string" &&
+      typeof candidate.createdAt === "string" &&
+      Boolean(candidate.snapshot)
+    );
   }
   return false;
 }

@@ -65,7 +65,7 @@ import { ApiSettings } from "./panels/ApiSettings";
 import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { GeneLibraryPopover } from "./panels/GeneLibrary";
-import { createPromptGene, loadGenes, saveGenes, type GeneTemplate } from "./panels/geneLibraryModel";
+import { createPromptGene, createWorkflowGene, loadGenes, saveGenes, type GeneTemplate } from "./panels/geneLibraryModel";
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunHistory } from "./panels/RunHistory";
@@ -560,6 +560,13 @@ export function App() {
   );
 
   const handleAddGene = useCallback(() => {
+    const workflowSource = canvasRef.current?.workflowGeneSource();
+    if (workflowSource) {
+      setGenes((current) => [createWorkflowGene(workflowSource.snapshot, current), ...current]);
+      setStatus(`已添加流程基因（${workflowSource.nodeCount} 个节点）`);
+      return;
+    }
+
     const source = canvasRef.current?.promptGeneSource();
     if (!source) {
       setStatus("请先创建或选择提示词节点");
@@ -573,7 +580,9 @@ export function App() {
   const handleUseGene = useCallback(
     (gene: GeneTemplate) => {
       if (gene.type !== "prompt") {
-        setStatus("工作流基因稍后开放");
+        const imported = canvasRef.current?.importWorkflowGene(gene.snapshot) ?? 0;
+        setStatus(imported > 0 ? `已导入 ${gene.name}` : "流程基因没有可导入节点");
+        setIsGeneLibraryOpen(false);
         return;
       }
 

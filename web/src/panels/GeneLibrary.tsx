@@ -16,8 +16,6 @@ export function GeneLibraryPopover({
   onRenameGene: (gene: GeneTemplate) => void;
   onUseGene: (gene: GeneTemplate) => void;
 }) {
-  const promptGenes = genes.filter((gene) => gene.type === "prompt");
-
   return (
     <div className="gene-library-popover" role="dialog" aria-label="基因库">
       <header>
@@ -30,12 +28,19 @@ export function GeneLibraryPopover({
         </button>
       </header>
       <div className="gene-library-list">
-        {promptGenes.length ? (
-          promptGenes.map((gene) => (
+        {genes.length ? (
+          genes.map((gene) => (
             <div className="gene-tile" key={gene.id}>
-              <button type="button" className="gene-chip" data-testid="gene-chip" onClick={() => onUseGene(gene)} title={gene.prompt}>
+              <button
+                type="button"
+                className="gene-chip"
+                data-testid="gene-chip"
+                onClick={() => onUseGene(gene)}
+                title={gene.type === "prompt" ? gene.prompt : `${gene.nodeCount} 个节点`}
+              >
                 <Sparkles aria-hidden="true" size={15} />
                 <span>{gene.name}</span>
+                {gene.type === "workflow" ? <small>{gene.nodeCount} 节点</small> : null}
               </button>
               <div className="gene-tile-actions" aria-label={`${gene.name} 操作`}>
                 <button type="button" data-testid="gene-rename-button" onClick={() => onRenameGene(gene)} title="重命名">

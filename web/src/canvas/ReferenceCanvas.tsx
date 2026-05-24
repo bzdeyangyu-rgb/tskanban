@@ -31,6 +31,7 @@ export type ReferenceCanvasHandle = {
   addNode: (definition: NodeDefinition, options?: { x?: number; y?: number; connectFrom?: string }) => string;
   compileSnapshot: (canvasId: string, sessionId?: string) => CanvasSnapshot;
   restoreSnapshot: (snapshot: CanvasSnapshot) => void;
+  importWorkflowGene: (snapshot: CanvasSnapshot) => number;
   updateNodeStatuses: (nodes: Array<{ nodeId: string; status: CanvasNodeStatus; errorMessage?: string }>) => void;
   addOutputsToOutputNode: (assets: Array<{ assetId: string; url: string }>) => boolean;
   selectedOutputAsset: () => { assetId: string; url: string } | undefined;
@@ -38,6 +39,7 @@ export type ReferenceCanvasHandle = {
   updateSelectedNode: (patch: Record<string, unknown>) => void;
   importImageNode: (nodeId: string, data: Record<string, unknown>) => void;
   promptGeneSource: () => { prompt: string; sourceNodeId: string } | undefined;
+  workflowGeneSource: () => { snapshot: CanvasSnapshot; nodeCount: number } | undefined;
   hasNodes: () => boolean;
 };
 
@@ -286,6 +288,13 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         setViewport(snapshot.viewport ?? { x: 80, y: 80, zoom: 1 });
         setSelectedIds(snapshot.selectedNodeId ? [snapshot.selectedNodeId] : []);
       },
+      importWorkflowGene: (snapshot) => {
+        const result = importWorkflowGeneToCanvas(nodes, edges, snapshot, `gene_${Date.now().toString(36)}_${nodeCounterRef.current++}`);
+        setNodes(result.nodes);
+        setEdges(result.edges);
+        setSelectedIds(result.importedIds);
+        return result.importedIds.length;
+      },
       updateNodeStatuses: (runNodes) => {
         setNodes((current) =>
           current.map((node) => {
@@ -360,6 +369,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       },
       importImageNode: (nodeId, data) => updateNodeData(nodeId, data),
       promptGeneSource: () => promptGeneSourceFromNodes(nodes, selectedIds),
+      workflowGeneSource: () => workflowGeneSourceFromSelection(nodes, edges, selectedIds),
       hasNodes: () => nodes.length > 0
     }),
     [addNode, edges, nodes, selectedIds, updateNodeData, viewport]
@@ -976,6 +986,74 @@ export function promptGeneSourceFromNodes(
   }
 
   return undefined;
+}
+
+export function workflowGeneSourceFromSelection(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  selectedIds: readonly string[]
+): { snapshot: CanvasSnapshot; nodeCount: number } | undefined {
+  if (selectedIds.length < 2) {
+    return undefined;
+  }
+
+  const selected = new Set(selectedIds);
+  const pickedNodes = nodes.filter((node) => selected.has(node.id)).map((node) => ({ ...node, data: { ...node.data }, status: "idle" as CanvasNodeStatus }));
+  if (pickedNodes.length < 2) {
+    return undefined;
+  }
+
+  const pickedEdges = edges
+    .filter((edge) => selected.has(edge.from) && selected.has(edge.to))
+    .map((edge) => ({ ...edge }));
+
+  return {
+    nodeCount: pickedNodes.length,
+    snapshot: {
+      canvasId: "gene-workflow",
+      nodes: pickedNodes,
+      edges: pickedEdges,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      updatedAt: new Date().toISOString()
+    }
+  };
+}
+
+export function importWorkflowGeneToCanvas(
+  currentNodes: readonly CanvasNode[],
+  currentEdges: readonly CanvasEdge[],
+  snapshot: CanvasSnapshot,
+  idPrefix: string,
+  offset = 80
+): { nodes: CanvasNode[]; edges: CanvasEdge[]; importedIds: string[] } {
+  const idMap = new Map<string, string>();
+  const importedNodes = snapshot.nodes.map((node, index) => {
+    const id = `${idPrefix}_node_${index}`;
+    idMap.set(node.id, id);
+    return {
+      ...node,
+      id,
+      x: node.x + offset,
+      y: node.y + offset,
+      data: { ...node.data },
+      status: "idle" as CanvasNodeStatus
+    };
+  });
+
+  const importedEdges = snapshot.edges.flatMap((edge, index) => {
+    const from = idMap.get(edge.from);
+    const to = idMap.get(edge.to);
+    if (!from || !to) {
+      return [];
+    }
+    return [{ ...edge, id: `${idPrefix}_edge_${index}`, from, to }];
+  });
+
+  return {
+    nodes: [...currentNodes, ...importedNodes],
+    edges: [...currentEdges, ...importedEdges],
+    importedIds: importedNodes.map((node) => node.id)
+  };
 }
 
 function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {

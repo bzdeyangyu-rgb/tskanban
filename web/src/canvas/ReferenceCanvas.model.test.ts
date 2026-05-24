@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasNode } from "./flowTypes";
-import { collectDragNodeIds, deleteCanvasSelection, moveCanvasNodes, promptGeneSourceFromNodes } from "./ReferenceCanvas";
+import {
+  collectDragNodeIds,
+  deleteCanvasSelection,
+  importWorkflowGeneToCanvas,
+  moveCanvasNodes,
+  promptGeneSourceFromNodes,
+  workflowGeneSourceFromSelection
+} from "./ReferenceCanvas";
 
 const nodes: CanvasNode[] = [
   { id: "a", type: "image", x: 10, y: 20, width: 100, height: 80, data: {} },
@@ -37,5 +44,45 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(promptGeneSourceFromNodes(promptNodes, ["old"])).toEqual({ prompt: "旧提示词", sourceNodeId: "old" });
     expect(promptGeneSourceFromNodes(promptNodes, [])).toEqual({ prompt: "新提示词", sourceNodeId: "new" });
+  });
+
+  it("captures selected nodes and internal edges as a workflow gene", () => {
+    const result = workflowGeneSourceFromSelection(
+      [
+        { id: "p", type: "prompt", x: 10, y: 20, width: 100, height: 100, data: { text: "提示词" } },
+        { id: "g", type: "api_text2img", x: 150, y: 20, width: 120, height: 120, data: { model: "m" } },
+        { id: "o", type: "output", x: 310, y: 20, width: 120, height: 120, data: {} }
+      ],
+      [
+        { id: "e1", from: "p", to: "g" },
+        { id: "e2", from: "g", to: "o" }
+      ],
+      ["p", "g"]
+    );
+
+    expect(result?.snapshot.nodes.map((node) => node.id)).toEqual(["p", "g"]);
+    expect(result?.snapshot.edges).toEqual([{ id: "e1", from: "p", to: "g" }]);
+  });
+
+  it("imports workflow genes with fresh node and edge ids", () => {
+    const result = importWorkflowGeneToCanvas(
+      [{ id: "existing", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} }],
+      [],
+      {
+        canvasId: "gene",
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [
+          { id: "p", type: "prompt", x: 10, y: 20, width: 100, height: 100, data: { text: "提示词" } },
+          { id: "g", type: "api_text2img", x: 150, y: 20, width: 120, height: 120, data: {} }
+        ],
+        edges: [{ id: "e1", from: "p", to: "g" }]
+      },
+      "gene_new",
+      40
+    );
+
+    expect(result.nodes).toHaveLength(3);
+    expect(result.edges).toEqual([{ id: "gene_new_edge_0", from: "gene_new_node_0", to: "gene_new_node_1" }]);
+    expect(result.importedIds).toEqual(["gene_new_node_0", "gene_new_node_1"]);
   });
 });
