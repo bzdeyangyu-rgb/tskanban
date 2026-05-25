@@ -849,7 +849,7 @@ function ReferenceGeneratorBody({
       </div>
       <div className="reference-gen-run-row">
         <button type="button" className="reference-gen-btn">
-          {node.type === "api_text2img" ? "API生成" : node.type === "api_img2img" ? "MS生成" : "局部重绘"}
+          {node.type === "api_text2img" ? "API生成" : node.type === "api_img2img" ? "图生图" : "局部重绘"}
         </button>
       </div>
     </div>
@@ -943,7 +943,7 @@ export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeD
     case "loop":
       return { type, title: "循环", data: { count: 4, prompt: "" }, width: 300, height: 200 };
     case "api_img2img":
-      return { type, title: "MS生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
+      return { type, title: "图生图", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
     case "api_inpaint":
       return { type, title: "局部重绘", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
     case "video":
@@ -1270,7 +1270,7 @@ function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label:
     { type: "prompt", label: "提示词", icon: FileText },
     { type: "loop", label: "循环", icon: Repeat2 },
     { type: "api_text2img", label: "API生成", icon: WandSparkles },
-    { type: "api_img2img", label: "MS生成", icon: CloudLightning },
+    { type: "api_img2img", label: "图生图", icon: ImagePlus },
     { type: "video", label: "视频", icon: Clapperboard },
     { type: "output", label: "Output", icon: CircleDot }
   ];
@@ -1282,7 +1282,7 @@ function nodeIcon(type: CanvasNodeKind): LucideIcon {
     prompt: FileText,
     loop: Repeat2,
     api_text2img: WandSparkles,
-    api_img2img: CloudLightning,
+    api_img2img: ImagePlus,
     api_inpaint: Edit3,
     video: Clapperboard,
     comfy: Workflow,
@@ -1298,7 +1298,7 @@ function nodeTitle(type: CanvasNodeKind): string {
     prompt: "提示词",
     loop: "循环",
     api_text2img: "API生成",
-    api_img2img: "MS生成",
+    api_img2img: "图生图",
     api_inpaint: "局部重绘",
     video: "视频生成",
     comfy: "ComfyUI",
