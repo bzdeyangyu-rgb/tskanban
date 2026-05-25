@@ -78,27 +78,30 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   const [edges, setEdges] = useState<CanvasEdge[]>(starterEdges());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ x: 80, y: 80, zoom: 0.92 });
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null);
 
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedIds[0]), [nodes, selectedIds]);
-  const selectedEdgeAction = useMemo(() => {
-    if (!selectedEdgeId) {
-      return null;
-    }
-    const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
-    const from = nodes.find((node) => node.id === selectedEdge?.from);
-    const to = nodes.find((node) => node.id === selectedEdge?.to);
-    if (!selectedEdge || !from || !to) {
-      return null;
-    }
-    return {
-      edgeId: selectedEdge.id,
-      ...edgeActionPosition(from, to, viewport)
-    };
-  }, [edges, nodes, selectedEdgeId, viewport]);
+  const edgeActions = useMemo(
+    () =>
+      edges.flatMap((edge) => {
+        const from = nodes.find((node) => node.id === edge.from);
+        const to = nodes.find((node) => node.id === edge.to);
+        if (!from || !to) {
+          return [];
+        }
+        return [
+          {
+            edgeId: edge.id,
+            ...edgeActionPosition(from, to, viewport)
+          }
+        ];
+      }),
+    [edges, nodes, viewport]
+  );
 
   useEffect(() => {
     if (!selectedNode) {
@@ -170,6 +173,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     (edgeId: string) => {
       setEdges((current) => current.filter((edge) => edge.id !== edgeId));
       setSelectedEdgeId(null);
+      setHoveredEdgeId(null);
       onStatus("\u5df2\u5220\u9664 1 \u6761\u8fde\u7ebf");
     },
     [onStatus]
@@ -465,30 +469,45 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
                   setSelectedIds([]);
                   setSelectedEdgeId(edge.id);
                 }}
+                onPointerEnter={() => setHoveredEdgeId(edge.id)}
+                onPointerLeave={() => setHoveredEdgeId((current) => (current === edge.id ? null : current))}
               />
             );
           })}
         </g>
       </svg>
-      {selectedEdgeAction ? (
+      {edgeActions.map((edgeAction) => (
         <button
           aria-label={"\u5220\u9664\u8fde\u7ebf"}
-          className="reference-edge-delete"
-          style={{ left: selectedEdgeAction.x, top: selectedEdgeAction.y }}
+          className={[
+            "reference-edge-delete",
+            selectedEdgeId === edgeAction.edgeId ? "is-selected" : "",
+            hoveredEdgeId === edgeAction.edgeId ? "is-hovered" : ""
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          key={edgeAction.edgeId}
+          style={{ left: edgeAction.x, top: edgeAction.y }}
           title={"\u5220\u9664\u8fde\u7ebf"}
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            deleteEdge(selectedEdgeAction.edgeId);
+            deleteEdge(edgeAction.edgeId);
           }}
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            setSelectedIds([]);
+            setSelectedEdgeId(edgeAction.edgeId);
+          }}
+          onPointerEnter={() => setHoveredEdgeId(edgeAction.edgeId)}
+          onPointerLeave={() => {
+            setHoveredEdgeId((current) => (current === edgeAction.edgeId ? null : current));
           }}
         >
           <X size={13} strokeWidth={3} />
         </button>
-      ) : null}
+      ))}
       <div
         className="reference-canvas-plane"
         style={{ "--canvas-x": `${viewport.x}px`, "--canvas-y": `${viewport.y}px`, "--canvas-z": viewport.zoom } as CSSProperties}
