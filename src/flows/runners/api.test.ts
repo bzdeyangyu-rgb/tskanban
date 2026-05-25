@@ -116,6 +116,25 @@ describe("api flow runners", () => {
     });
   });
 
+  it("prefers connected prompt nodes over stale generator prompt data", async () => {
+    const calls: unknown[] = [];
+    const runners = createApiFlowRunners({
+      session: session(),
+      generateImage: async (request) => {
+        calls.push(request);
+        return { outputAssets: ["data:image/png;base64,aGVsbG8="], raw: { ok: true } };
+      }
+    });
+
+    await runners.api_text2img?.({
+      node: node("g1", "api_text2img", { model: "m1", prompt: "旧节点提示词" }),
+      upstreamNodes: [node("p1", "prompt", { text: "连线提示词" })],
+      upstreamResults: []
+    });
+
+    expect(calls[0]).toMatchObject({ prompt: "连线提示词" });
+  });
+
   it("runs inpaint with base and mask assets from node data", async () => {
     const calls: unknown[] = [];
     const s = session();

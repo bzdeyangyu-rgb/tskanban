@@ -276,14 +276,14 @@ function addOptionalNumberParam(params: Record<string, unknown>, key: string, va
 }
 
 function promptFrom(upstreamNodes: FlowNode[], node: FlowNode): string {
-  const direct = optionalStringData(node, "prompt");
-  if (direct) {
-    return direct;
-  }
-
   const promptNode = upstreamNodes.find((upstream) => upstream.type === "prompt");
   if (promptNode) {
     return stringData(promptNode, "text");
+  }
+
+  const direct = optionalStringData(node, "prompt");
+  if (direct) {
+    return direct;
   }
 
   throw new Error(`${node.id} requires an upstream prompt node or data.prompt`);

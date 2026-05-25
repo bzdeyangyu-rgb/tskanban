@@ -81,14 +81,14 @@ describe("ReferenceCanvas model helpers", () => {
     });
   });
 
-  it("uses generator prompt overrides before connected prompt nodes", () => {
+  it("uses connected prompt nodes before stale generator prompt data", () => {
     const summary = generatorNodeInputSummary(
-      { id: "g", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: { prompt: "节点覆盖提示词" } },
+      { id: "g", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: { prompt: "旧节点提示词" } },
       [{ id: "p", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: { text: "上游提示词" } }]
     );
 
-    expect(summary.prompt).toBe("节点覆盖提示词");
-    expect(summary.promptSource).toBe("g");
+    expect(summary.prompt).toBe("上游提示词");
+    expect(summary.promptSource).toBe("p");
   });
 
   it("merges output assets without duplicating existing results", () => {

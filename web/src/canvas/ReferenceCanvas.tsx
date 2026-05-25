@@ -761,7 +761,6 @@ function ReferenceGeneratorBody({
   const count = clamp(Number(node.data.count) || 1, 1, 8);
   const customWidth = stringValue(node.data.customWidth);
   const customHeight = stringValue(node.data.customHeight);
-  const negativePrompt = stringValue(node.data.negativePrompt);
   const params = recordValue(node.data.params);
   const seed = stringValue(params.seed);
   const showCustomSize = resolution === "custom" || ratio === "custom";
@@ -795,14 +794,6 @@ function ReferenceGeneratorBody({
         )}
       </div>
       <div className="reference-gen-settings">
-        <label className="reference-gen-textarea">
-          <span>提示词覆盖</span>
-          <textarea value={stringValue(node.data.prompt)} onChange={(event) => onData(node.id, { prompt: event.target.value })} />
-        </label>
-        <label className="reference-gen-textarea">
-          <span>负面提示词</span>
-          <textarea value={negativePrompt} onChange={(event) => onData(node.id, { negativePrompt: event.target.value })} />
-        </label>
         <div className="reference-gen-row">
           <select value={providerId} onChange={(event) => onData(node.id, { providerId: event.target.value })}>
             <option value="">默认 API</option>
@@ -1109,13 +1100,13 @@ export function generatorNodeInputSummary(
   promptSource?: string | undefined;
   images: Array<{ assetId: string; url: string; name: string; sourceNodeId: string }>;
 } {
-  const directPrompt = stringValue(node.data.prompt).trim();
   const promptNode = upstreamNodes.find((upstream) => ["prompt", "loop", "llm"].includes(upstream.type));
   const upstreamPrompt = promptNode ? (stringValue(promptNode.data.text) || stringValue(promptNode.data.prompt)).trim() : "";
+  const directPrompt = stringValue(node.data.prompt).trim();
 
   return {
-    prompt: directPrompt || upstreamPrompt,
-    promptSource: directPrompt ? node.id : promptNode?.id,
+    prompt: upstreamPrompt || directPrompt,
+    promptSource: upstreamPrompt ? promptNode?.id : directPrompt ? node.id : undefined,
     images: upstreamNodes.flatMap((upstream) => imageInputsFromNode(upstream))
   };
 }
