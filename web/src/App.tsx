@@ -386,10 +386,10 @@ export function App() {
             url: uploaded.asset.publicUrl,
             name: file.name,
             mime: uploaded.asset.mime,
-            roleTag: "绱犳潗"
+            roleTag: "\u672c\u5730\u5bfc\u5165"
           })
         });
-        setStatus(`宸插鍏ュ埌鍥剧墖鑺傜偣锛?{file.name}`);
+        setStatus(`\u5df2\u5bfc\u5165\u5230\u56fe\u7247\u8282\u70b9\uff1a${file.name}`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -1033,10 +1033,10 @@ function StudioSidebar({
           );
         })}
       </nav>
-      <div className="studio-side-actions" aria-label="杈呭姪鎿嶄綔">
-        <button type="button" title="黑夜模式" className={theme === "dark" ? "is-active" : ""} onClick={onThemeToggle}>
+      <div className="studio-side-actions" aria-label={"\u8f85\u52a9\u64cd\u4f5c"}>
+        <button type="button" title={theme === "dark" ? "\u9ed1\u591c\u6a21\u5f0f" : "\u767d\u5929\u6a21\u5f0f"} className={theme === "dark" ? "is-active" : ""} onClick={onThemeToggle}>
           <Sun aria-hidden="true" size={16} />
-          <span>{theme === "dark" ? "黑夜模式" : "白天模式"}</span>
+          <span>{theme === "dark" ? "\u9ed1\u591c\u6a21\u5f0f" : "\u767d\u5929\u6a21\u5f0f"}</span>
         </button>
         <button type="button" title="中文" onClick={onLanguageToggle}>
           <Languages aria-hidden="true" size={16} />
@@ -1071,6 +1071,7 @@ function StudioApiPage({
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("");
   const [outputs, setOutputs] = useState<Array<{ assetId: string; url: string }>>([]);
+  const [chatReply, setChatReply] = useState("");
   const controls = apiPageControls[pageId];
   const [controlValues, setControlValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(controls.fields.map((field) => [field.key, field.defaultValue]))
@@ -1090,8 +1091,14 @@ function StudioApiPage({
   const handleRunQuickTask = async () => {
     setMessage("");
     setOutputs([]);
+    setChatReply("");
     if (pageId === "gpt-chat") {
-      setMessage("GPT 对话入口已保留，当前还需要补 /api/chat 后才可真正发送。");
+      if (!prompt.trim()) {
+        setMessage("请先输入对话内容。");
+        return;
+      }
+      setChatReply(draftPromptAssistantReply(prompt, controlValues.mode, controlValues.context));
+      setMessage("已生成提示词建议");
       return;
     }
     if (needsImage && !file) {
@@ -1195,24 +1202,26 @@ function StudioApiPage({
           <aside className="studio-preview-panel">
             <header>
               <strong>{controls.previewTitle}</strong>
-              <span>{model || "鏈€夋嫨妯″瀷"}</span>
+              <span>{model || "未选择模型"}</span>
             </header>
-            {outputs.length ? (
+            {pageId === "gpt-chat" && chatReply ? (
+              <div className="studio-chat-reply">{chatReply}</div>
+            ) : outputs.length ? (
               <div className="studio-feature-output">
                 {outputs.map((output) => (
                   <img src={output.url} alt={output.assetId} key={output.assetId} />
                 ))}
               </div>
             ) : (
-                <div className="studio-preview-empty">{file ? file.name : "等待提交任务后显示预览"}</div>
+              <div className="studio-preview-empty">{file ? file.name : "等待提交任务后显示预览"}</div>
             )}
           </aside>
         </div>
         <div className="studio-management-panel">
           <strong>{controls.managementTitle}</strong>
-          <span>褰撳墠鐗堟湰 0</span>
-          <span>鎵归噺闃熷垪 0</span>
-          <span>鍘嗗彶璁板綍 0</span>
+          <span>当前版本 0</span>
+          <span>批量队列 0</span>
+          <span>历史记录 0</span>
         </div>
         <button type="button" className="studio-feature-primary" disabled={running} onClick={handleRunQuickTask}>
           {running ? <RefreshCw aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
@@ -1287,6 +1296,19 @@ function quickApiFlow(input: {
     updatedAt: now
   };
 }
+
+function draftPromptAssistantReply(prompt: string, mode = "提示词优化", context = ""): string {
+  const trimmed = prompt.trim();
+  const contextLine = context.trim() ? `上下文：${context.trim()}\n` : "";
+  if (mode === "流程建议") {
+    return `${contextLine}建议流程：提示词节点 -> API生成节点 -> Output 节点。\n\n输入目标：${trimmed}\n\n建议先把主体、风格、光线、构图拆成独立短句，再保存为基因，方便后续复用。`;
+  }
+  if (mode === "创意讨论") {
+    return `${contextLine}创意方向：围绕“${trimmed}”可以先做 3 个版本：写实商业图、电影感构图、产品细节强化。每个版本建议单独保存为流程基因。`;
+  }
+  return `${contextLine}优化后的提示词：${trimmed}，主体清晰，构图稳定，细节丰富，光线自然，材质真实，高质量商业视觉。\n\n负面约束：低清晰度、畸形结构、多余文字、过曝、噪点。`;
+}
+
 function CanvasGate({
   items,
   onClear,
@@ -1643,7 +1665,7 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
 function drawerTitle(mode: Exclude<DrawerMode, null>): string {
   switch (mode) {
     case "assets":
-      return "鏈湴绱犳潗";
+      return "本地素材";
     case "nodes":
       return "节点工具";
     case "settings":

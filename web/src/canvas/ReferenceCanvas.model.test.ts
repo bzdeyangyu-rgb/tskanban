@@ -3,6 +3,7 @@ import type { CanvasNode } from "./flowTypes";
 import {
   collectDragNodeIds,
   deleteCanvasSelection,
+  edgeActionPosition,
   importWorkflowGeneToCanvas,
   moveCanvasNodes,
   promptGeneSourceFromNodes,
@@ -39,6 +40,10 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(result.nodes).toHaveLength(3);
     expect(result.edges).toEqual([]);
+  });
+
+  it("places the visible edge delete action at the link midpoint in screen space", () => {
+    expect(edgeActionPosition(nodes[0], nodes[1], { x: 80, y: 40, zoom: 2 })).toEqual({ x: 330, y: 175 });
   });
 
   it("uses selected prompt before newest prompt for gene capture", () => {

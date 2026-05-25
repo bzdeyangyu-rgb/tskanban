@@ -10,6 +10,7 @@ import {
   Repeat2,
   WandSparkles,
   Workflow,
+  X,
   type LucideIcon
 } from "lucide-react";
 import {
@@ -83,6 +84,21 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null);
 
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedIds[0]), [nodes, selectedIds]);
+  const selectedEdgeAction = useMemo(() => {
+    if (!selectedEdgeId) {
+      return null;
+    }
+    const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+    const from = nodes.find((node) => node.id === selectedEdge?.from);
+    const to = nodes.find((node) => node.id === selectedEdge?.to);
+    if (!selectedEdge || !from || !to) {
+      return null;
+    }
+    return {
+      edgeId: selectedEdge.id,
+      ...edgeActionPosition(from, to, viewport)
+    };
+  }, [edges, nodes, selectedEdgeId, viewport]);
 
   useEffect(() => {
     if (!selectedNode) {
@@ -150,6 +166,15 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     );
   }, []);
 
+  const deleteEdge = useCallback(
+    (edgeId: string) => {
+      setEdges((current) => current.filter((edge) => edge.id !== edgeId));
+      setSelectedEdgeId(null);
+      onStatus("\u5df2\u5220\u9664 1 \u6761\u8fde\u7ebf");
+    },
+    [onStatus]
+  );
+
   const deleteSelected = useCallback(() => {
     if (selectedIds.length === 0 && !selectedEdgeId) {
       return;
@@ -162,7 +187,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     });
     setSelectedIds([]);
     setSelectedEdgeId(null);
-    onStatus(selectedEdgeId ? "已删除 1 条连线" : `已删除 ${deletedNodeCount} 个节点`);
+    onStatus(selectedEdgeId ? "\u5df2\u5220\u9664 1 \u6761\u8fde\u7ebf" : `\u5df2\u5220\u9664 ${deletedNodeCount} \u4e2a\u8282\u70b9`);
   }, [edges, onStatus, selectedEdgeId, selectedIds]);
 
   useEffect(() => {
@@ -445,6 +470,25 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
           })}
         </g>
       </svg>
+      {selectedEdgeAction ? (
+        <button
+          aria-label={"\u5220\u9664\u8fde\u7ebf"}
+          className="reference-edge-delete"
+          style={{ left: selectedEdgeAction.x, top: selectedEdgeAction.y }}
+          title={"\u5220\u9664\u8fde\u7ebf"}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            deleteEdge(selectedEdgeAction.edgeId);
+          }}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <X size={13} strokeWidth={3} />
+        </button>
+      ) : null}
       <div
         className="reference-canvas-plane"
         style={{ "--canvas-x": `${viewport.x}px`, "--canvas-y": `${viewport.y}px`, "--canvas-z": viewport.zoom } as CSSProperties}
@@ -1001,7 +1045,20 @@ function linkPath(from: CanvasNode, to: CanvasNode): string {
   return `M ${start.x} ${start.y} C ${start.x + dx} ${start.y}, ${end.x - dx} ${end.y}, ${end.x} ${end.y}`;
 }
 
-function nodePortPoint(node: CanvasNode): { x: number; y: number } {
+export function edgeActionPosition(
+  from: Pick<CanvasNode, "x" | "y" | "width" | "height">,
+  to: Pick<CanvasNode, "x" | "y" | "width" | "height">,
+  viewport: Viewport
+): { x: number; y: number } {
+  const start = nodePortPoint(from);
+  const end = { x: to.x, y: to.y + to.height / 2 };
+  return {
+    x: viewport.x + ((start.x + end.x) / 2) * viewport.zoom,
+    y: viewport.y + ((start.y + end.y) / 2) * viewport.zoom
+  };
+}
+
+function nodePortPoint(node: Pick<CanvasNode, "x" | "y" | "width" | "height">): { x: number; y: number } {
   return { x: node.x + node.width, y: node.y + node.height / 2 };
 }
 
