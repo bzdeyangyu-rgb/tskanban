@@ -8,8 +8,10 @@ import {
   promptGeneSourceFromNodes,
   generatorNodeInputSummary,
   mergeOutputAssets,
+  outputNodeForAssets,
   selectedOutputAssetFromNode,
   upstreamNodesFor,
+  hasConnectedOutput,
   workflowGeneSourceFromSelection
 } from "./ReferenceCanvas";
 
@@ -128,6 +130,41 @@ describe("ReferenceCanvas model helpers", () => {
       assetId: "a2",
       url: "/a2.png"
     });
+  });
+
+  it("chooses the output node connected to the executed generator", () => {
+    const canvasNodes: CanvasNode[] = [
+      { id: "g1", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: {} },
+      { id: "g2", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: {} },
+      { id: "o1", type: "output", x: 0, y: 0, width: 100, height: 100, data: {} },
+      { id: "o2", type: "output", x: 0, y: 0, width: 100, height: 100, data: {} }
+    ];
+
+    const output = outputNodeForAssets(canvasNodes, [
+      { id: "e1", from: "g1", to: "o1" },
+      { id: "e2", from: "g2", to: "o2" }
+    ], "g2");
+
+    expect(output?.id).toBe("o2");
+  });
+
+  it("falls back to the first output node when executed generator has no output edge", () => {
+    const canvasNodes: CanvasNode[] = [
+      { id: "g1", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: {} },
+      { id: "o1", type: "output", x: 0, y: 0, width: 100, height: 100, data: {} }
+    ];
+
+    expect(outputNodeForAssets(canvasNodes, [], "g1")?.id).toBe("o1");
+  });
+
+  it("detects whether a generator has a connected output", () => {
+    const canvasNodes: CanvasNode[] = [
+      { id: "g1", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: {} },
+      { id: "o1", type: "output", x: 0, y: 0, width: 100, height: 100, data: {} }
+    ];
+
+    expect(hasConnectedOutput(canvasNodes, [{ id: "e1", from: "g1", to: "o1" }], "g1")).toBe(true);
+    expect(hasConnectedOutput(canvasNodes, [], "g1")).toBe(false);
   });
 
   it("captures selected nodes and internal edges as a workflow gene", () => {

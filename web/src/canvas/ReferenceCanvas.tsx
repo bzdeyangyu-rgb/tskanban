@@ -35,7 +35,7 @@ export type ReferenceCanvasHandle = {
   restoreSnapshot: (snapshot: CanvasSnapshot) => void;
   importWorkflowGene: (snapshot: CanvasSnapshot) => number;
   updateNodeStatuses: (nodes: Array<{ nodeId: string; status: CanvasNodeStatus; errorMessage?: string }>) => void;
-  addOutputsToOutputNode: (assets: Array<{ assetId: string; url: string }>) => boolean;
+  addOutputsToOutputNode: (assets: Array<{ assetId: string; url: string }>, sourceNodeId?: string) => boolean;
   selectedOutputAsset: () => { assetId: string; url: string } | undefined;
   groupSelected: () => boolean;
   updateSelectedNode: (patch: Record<string, unknown>) => void;
@@ -321,11 +321,11 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
           })
         );
       },
-      addOutputsToOutputNode: (assets) => {
+      addOutputsToOutputNode: (assets, sourceNodeId) => {
         if (assets.length === 0) {
           return false;
         }
-        const output = nodes.find((node) => node.type === "output");
+        const output = outputNodeForAssets(nodes, edges, sourceNodeId);
         if (!output) {
           return false;
         }
@@ -515,6 +515,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
               });
             }}
             onRunNode={() => onRunNode(node.id)}
+            hasConnectedOutput={hasConnectedOutput(nodes, edges, node.id)}
             onResizeStart={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -555,6 +556,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
 
 function ReferenceNodeCard({
   node,
+  hasConnectedOutput,
   onData,
   onDragStart,
   onFiles,
@@ -567,6 +569,7 @@ function ReferenceNodeCard({
   upstreamNodes
 }: {
   node: CanvasNode;
+  hasConnectedOutput: boolean;
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
   onDragStart: (event: ReactPointerEvent) => void;
   onFiles: (files: File[]) => void;
@@ -613,7 +616,7 @@ function ReferenceNodeCard({
         <strong>{nodeTitle(node.type)}</strong>
         <small>{node.status ?? "idle"}</small>
       </header>
-      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset)}</div>
+      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset, hasConnectedOutput)}</div>
       {node.type !== "output" && node.type !== ("group" as CanvasNodeKind) ? (
         <button className="reference-node-port" type="button" title="拖出连线" onPointerDown={onLinkStart} />
       ) : null}
@@ -628,7 +631,8 @@ function renderNodeBody(
   onData: (nodeId: string, patch: Record<string, unknown>) => void,
   onFiles: (files: File[]) => void,
   onRunNode: () => void,
-  onImageFromAsset: (asset: { assetId: string; url: string }) => void
+  onImageFromAsset: (asset: { assetId: string; url: string }) => void,
+  hasConnectedOutput: boolean
 ) {
   if (node.type === "image") {
     const url = stringValue(node.data.url);
@@ -692,7 +696,7 @@ function renderNodeBody(
   }
 
   if (isApiImageNode(node.type)) {
-    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} onRunNode={onRunNode} />;
+    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} onRunNode={onRunNode} hasConnectedOutput={hasConnectedOutput} />;
   }
 
   if (node.type === "output") {
@@ -743,11 +747,13 @@ function renderNodeBody(
 
 function ReferenceGeneratorBody({
   node,
+  hasConnectedOutput,
   upstreamNodes,
   onData,
   onRunNode
 }: {
   node: CanvasNode;
+  hasConnectedOutput: boolean;
   upstreamNodes: CanvasNode[];
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
   onRunNode: () => void;
@@ -867,6 +873,7 @@ function ReferenceGeneratorBody({
         ) : null}
       </div>
       <div className="reference-gen-run-row">
+        {!hasConnectedOutput ? <span className="reference-gen-warning">建议先连接 Output 节点</span> : null}
         <button type="button" className="reference-gen-btn" onClick={onRunNode}>
           {node.type === "api_text2img" ? "API生成" : node.type === "api_img2img" ? "图生图" : "局部重绘"}
         </button>
@@ -1124,6 +1131,26 @@ export function mergeOutputAssets(
     }
   });
   return next;
+}
+
+export function outputNodeForAssets(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  sourceNodeId?: string
+): CanvasNode | undefined {
+  if (sourceNodeId) {
+    const outputEdge = edges.find((edge) => edge.from === sourceNodeId && nodes.find((node) => node.id === edge.to)?.type === "output");
+    const connectedOutput = outputEdge ? nodes.find((node) => node.id === outputEdge.to && node.type === "output") : undefined;
+    if (connectedOutput) {
+      return connectedOutput;
+    }
+  }
+
+  return nodes.find((node) => node.type === "output");
+}
+
+export function hasConnectedOutput(nodes: readonly CanvasNode[], edges: readonly CanvasEdge[], sourceNodeId: string): boolean {
+  return edges.some((edge) => edge.from === sourceNodeId && nodes.find((node) => node.id === edge.to)?.type === "output");
 }
 
 export function selectedOutputAssetFromNode(node: Pick<CanvasNode, "type" | "data"> | undefined): { assetId: string; url: string } | undefined {

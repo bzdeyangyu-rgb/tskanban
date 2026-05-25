@@ -804,7 +804,7 @@ export function App() {
           errorMessage: node.errorMessage
         }))
       );
-      canvas.addOutputsToOutputNode(result.outputAssets);
+      canvas.addOutputsToOutputNode(result.outputAssets, targetNodeId);
       setStatus(
         result.run.status === "failed"
           ? `执行失败：${result.run.errorMessage ?? "请检查失败节点"}`
