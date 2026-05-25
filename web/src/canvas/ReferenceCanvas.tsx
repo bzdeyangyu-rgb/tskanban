@@ -49,6 +49,7 @@ type ReferenceCanvasProps = {
   defaultProviderId?: string;
   onFiles: (files: File[]) => void;
   onNodeFiles: (nodeId: string, files: File[]) => void;
+  onRunNode: (nodeId: string) => void;
   onSelectionChange: (selected: { id: string; meta: TshuabuNodeMeta } | null) => void;
   onStatus: (message: string) => void;
 };
@@ -66,7 +67,7 @@ const MIN_NODE_WIDTH = 220;
 const MIN_NODE_HEIGHT = 126;
 
 export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvasProps>(function ReferenceCanvas(
-  { defaultProviderId, onFiles, onNodeFiles, onSelectionChange, onStatus },
+  { defaultProviderId, onFiles, onNodeFiles, onRunNode, onSelectionChange, onStatus },
   ref
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -328,18 +329,13 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         if (!output) {
           return false;
         }
-        const existing = Array.isArray(output.data.outputs) ? output.data.outputs : [];
-        const seen = new Set(existing.map((item) => (isOutputAsset(item) ? item.assetId : "")));
-        const nextOutputs = [...existing];
-        assets.forEach((asset) => {
-          if (!seen.has(asset.assetId)) {
-            nextOutputs.push(asset);
-            seen.add(asset.assetId);
-          }
-        });
+        const existing = Array.isArray(output.data.outputs) ? output.data.outputs.filter(isOutputAsset) : [];
+        const nextOutputs = mergeOutputAssets(existing, assets);
         setNodes((current) =>
           current.map((node) =>
-            node.id === output.id ? { ...node, status: "success", data: { ...node.data, outputs: nextOutputs } } : node
+            node.id === output.id
+              ? { ...node, status: "success", data: { ...node.data, outputs: nextOutputs, selectedOutputAssetId: assets[0]?.assetId } }
+              : node
           )
         );
         setSelectedIds([output.id]);
@@ -347,9 +343,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       },
       selectedOutputAsset: () => {
         const output = nodes.find((node) => node.id === selectedIds[0] && node.type === "output");
-        const outputs = Array.isArray(output?.data.outputs) ? output.data.outputs : [];
-        const last = outputs[outputs.length - 1];
-        return isOutputAsset(last) ? last : undefined;
+        return selectedOutputAssetFromNode(output);
       },
       groupSelected: () => {
         if (selectedIds.length < 2) {
@@ -463,6 +457,23 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             upstreamNodes={upstreamNodesFor(nodes, edges, node.id)}
             onData={updateNodeData}
             onFiles={(files) => onNodeFiles(node.id, files)}
+            onImageFromAsset={(asset) => {
+              const imageId = addNode(
+                {
+                  type: "image",
+                  title: "图片节点",
+                  data: { assetId: asset.assetId, url: asset.url, name: asset.assetId, roleTag: "输出回填" },
+                  width: 280,
+                  height: 260
+                },
+                { x: node.x + node.width + 36, y: node.y }
+              );
+              setEdges((current) => [
+                ...current,
+                { id: `edge_${Date.now().toString(36)}_${edgeCounterRef.current++}`, from: node.id, to: imageId }
+              ]);
+              onStatus(`已回填 ${asset.assetId} 为图片节点`);
+            }}
             onLinkStart={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -503,6 +514,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
                 nodes
               });
             }}
+            onRunNode={() => onRunNode(node.id)}
             onResizeStart={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -546,8 +558,10 @@ function ReferenceNodeCard({
   onData,
   onDragStart,
   onFiles,
+  onImageFromAsset,
   onLinkStart,
   onResizeStart,
+  onRunNode,
   onSelect,
   selected,
   upstreamNodes
@@ -556,8 +570,10 @@ function ReferenceNodeCard({
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
   onDragStart: (event: ReactPointerEvent) => void;
   onFiles: (files: File[]) => void;
+  onImageFromAsset: (asset: { assetId: string; url: string }) => void;
   onLinkStart: (event: ReactPointerEvent) => void;
   onResizeStart: (event: ReactPointerEvent) => void;
+  onRunNode: () => void;
   onSelect: (event: ReactPointerEvent) => void;
   selected: boolean;
   upstreamNodes: CanvasNode[];
@@ -597,7 +613,7 @@ function ReferenceNodeCard({
         <strong>{nodeTitle(node.type)}</strong>
         <small>{node.status ?? "idle"}</small>
       </header>
-      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles)}</div>
+      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset)}</div>
       {node.type !== "output" && node.type !== ("group" as CanvasNodeKind) ? (
         <button className="reference-node-port" type="button" title="拖出连线" onPointerDown={onLinkStart} />
       ) : null}
@@ -610,7 +626,9 @@ function renderNodeBody(
   node: CanvasNode,
   upstreamNodes: CanvasNode[],
   onData: (nodeId: string, patch: Record<string, unknown>) => void,
-  onFiles: (files: File[]) => void
+  onFiles: (files: File[]) => void,
+  onRunNode: () => void,
+  onImageFromAsset: (asset: { assetId: string; url: string }) => void
 ) {
   if (node.type === "image") {
     const url = stringValue(node.data.url);
@@ -674,7 +692,7 @@ function renderNodeBody(
   }
 
   if (isApiImageNode(node.type)) {
-    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} />;
+    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} onRunNode={onRunNode} />;
   }
 
   if (node.type === "output") {
@@ -682,7 +700,15 @@ function renderNodeBody(
     return outputs.length ? (
       <div className="reference-output-grid">
         {outputs.map((asset) => (
-          <img src={asset.url} alt={asset.assetId} key={asset.assetId} />
+          <figure className={stringValue(node.data.selectedOutputAssetId) === asset.assetId ? "is-selected" : ""} key={asset.assetId}>
+            <button type="button" onClick={() => onData(node.id, { selectedOutputAssetId: asset.assetId })} title="选择结果">
+              <img src={asset.url} alt={asset.assetId} />
+            </button>
+            <figcaption>{asset.assetId}</figcaption>
+            <button type="button" className="reference-output-action" onClick={() => onImageFromAsset(asset)}>
+              回填
+            </button>
+          </figure>
         ))}
       </div>
     ) : (
@@ -718,11 +744,13 @@ function renderNodeBody(
 function ReferenceGeneratorBody({
   node,
   upstreamNodes,
-  onData
+  onData,
+  onRunNode
 }: {
   node: CanvasNode;
   upstreamNodes: CanvasNode[];
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
+  onRunNode: () => void;
 }) {
   const inputSummary = generatorNodeInputSummary(node, upstreamNodes);
   const prompt = inputSummary.prompt;
@@ -848,7 +876,7 @@ function ReferenceGeneratorBody({
         ) : null}
       </div>
       <div className="reference-gen-run-row">
-        <button type="button" className="reference-gen-btn">
+        <button type="button" className="reference-gen-btn" onClick={onRunNode}>
           {node.type === "api_text2img" ? "API生成" : node.type === "api_img2img" ? "图生图" : "局部重绘"}
         </button>
       </div>
@@ -1090,6 +1118,31 @@ export function generatorNodeInputSummary(
     promptSource: directPrompt ? node.id : promptNode?.id,
     images: upstreamNodes.flatMap((upstream) => imageInputsFromNode(upstream))
   };
+}
+
+export function mergeOutputAssets(
+  existing: readonly { assetId: string; url: string }[],
+  incoming: readonly { assetId: string; url: string }[]
+): Array<{ assetId: string; url: string }> {
+  const seen = new Set(existing.map((asset) => asset.assetId));
+  const next = [...existing];
+  incoming.forEach((asset) => {
+    if (!seen.has(asset.assetId)) {
+      next.push(asset);
+      seen.add(asset.assetId);
+    }
+  });
+  return next;
+}
+
+export function selectedOutputAssetFromNode(node: Pick<CanvasNode, "type" | "data"> | undefined): { assetId: string; url: string } | undefined {
+  if (node?.type !== "output") {
+    return undefined;
+  }
+  const outputs = Array.isArray(node.data.outputs) ? node.data.outputs.filter(isOutputAsset) : [];
+  const selectedId = stringValue(node.data.selectedOutputAssetId);
+  const selected = selectedId ? outputs.find((asset) => asset.assetId === selectedId) : undefined;
+  return selected ?? outputs[outputs.length - 1];
 }
 
 function imageInputsFromNode(node: CanvasNode): Array<{ assetId: string; url: string; name: string; sourceNodeId: string }> {

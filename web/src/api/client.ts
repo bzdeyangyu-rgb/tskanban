@@ -155,12 +155,13 @@ export type UploadedAsset = {
   createdAt: string;
 };
 
-export async function executeCanvasFlow(flow: CanvasSnapshot): Promise<FlowExecutionResponse> {
+export async function executeCanvasFlow(flow: CanvasSnapshot, targetNodeId?: string): Promise<FlowExecutionResponse> {
   const response = await fetch("/api/flows/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       sessionId: flow.sessionId,
+      targetNodeId,
       flow
     })
   });

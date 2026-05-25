@@ -7,6 +7,8 @@ import {
   moveCanvasNodes,
   promptGeneSourceFromNodes,
   generatorNodeInputSummary,
+  mergeOutputAssets,
+  selectedOutputAssetFromNode,
   upstreamNodesFor,
   workflowGeneSourceFromSelection
 } from "./ReferenceCanvas";
@@ -87,6 +89,45 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(summary.prompt).toBe("节点覆盖提示词");
     expect(summary.promptSource).toBe("g");
+  });
+
+  it("merges output assets without duplicating existing results", () => {
+    const next = mergeOutputAssets(
+      [{ assetId: "a1", url: "/a1.png" }],
+      [
+        { assetId: "a1", url: "/a1-new.png" },
+        { assetId: "a2", url: "/a2.png" }
+      ]
+    );
+
+    expect(next).toEqual([
+      { assetId: "a1", url: "/a1.png" },
+      { assetId: "a2", url: "/a2.png" }
+    ]);
+  });
+
+  it("reads the selected output asset before falling back to the latest result", () => {
+    const outputNode: CanvasNode = {
+      id: "out",
+      type: "output",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      data: {
+        selectedOutputAssetId: "a1",
+        outputs: [
+          { assetId: "a1", url: "/a1.png" },
+          { assetId: "a2", url: "/a2.png" }
+        ]
+      }
+    };
+
+    expect(selectedOutputAssetFromNode(outputNode)).toEqual({ assetId: "a1", url: "/a1.png" });
+    expect(selectedOutputAssetFromNode({ ...outputNode, data: { outputs: outputNode.data.outputs } })).toEqual({
+      assetId: "a2",
+      url: "/a2.png"
+    });
   });
 
   it("captures selected nodes and internal edges as a workflow gene", () => {

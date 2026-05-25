@@ -772,7 +772,7 @@ export function App() {
     },
     [session?.sessionId]
   );
-  const handleRun = useCallback(async () => {
+  const handleRun = useCallback(async (targetNodeId?: string) => {
     const canvas = canvasRef.current;
     if (!canvas) {
       setStatus("画布还在加载");
@@ -786,9 +786,14 @@ export function App() {
         return;
       }
 
-      canvas.updateNodeStatuses(snapshot.nodes.map((node) => ({ nodeId: node.id, status: "running" as CanvasNodeStatus })));
-      setStatus(`提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`);
-      const result = await executeCanvasFlow(snapshot);
+      const targetNodes = targetNodeId ? snapshot.nodes.filter((node) => node.id === targetNodeId) : snapshot.nodes;
+      canvas.updateNodeStatuses(targetNodes.map((node) => ({ nodeId: node.id, status: "running" as CanvasNodeStatus })));
+      setStatus(
+        targetNodeId
+          ? `提交节点：${targetNodes[0]?.type ?? targetNodeId}`
+          : `提交流程：${snapshot.nodes.length} 个节点，${snapshot.edges.length} 条连线`
+      );
+      const result = await executeCanvasFlow(snapshot, targetNodeId);
       setLastRunNodes(result.nodes);
       const nextSession = await fetchSession(result.sessionId);
       setSession(nextSession);
@@ -939,6 +944,7 @@ export function App() {
                       defaultProviderId={providers[0]?.id}
                       onFiles={handleImportFiles}
                       onNodeFiles={handleImportFilesToNode}
+                      onRunNode={(nodeId) => void handleRun(nodeId)}
                       onSelectionChange={setSelectedNode}
                       onStatus={setStatus}
                     />

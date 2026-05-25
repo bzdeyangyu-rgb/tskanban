@@ -3565,11 +3565,66 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.reference-output-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.reference-output-grid figure {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  grid-template-rows: minmax(72px, 1fr) auto auto;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: #0b111a;
+}
+
+.reference-output-grid figure.is-selected {
+  border-color: rgba(226, 232, 240, 0.78);
+  box-shadow: 0 0 0 2px rgba(226, 232, 240, 0.08);
+}
+
+.reference-output-grid button {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .reference-output-grid img {
+  display: block;
+  width: 100%;
+  height: 100%;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 14px;
+  object-fit: cover;
+  background: #101722;
+}
+
+.reference-output-grid figcaption {
+  overflow: hidden;
+  color: #9aa6b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-output-action {
+  height: 24px;
+  border-radius: 999px !important;
+  color: #0b111a;
+  background: #edf2fa !important;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .reference-empty,
