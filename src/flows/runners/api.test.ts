@@ -79,6 +79,43 @@ describe("api flow runners", () => {
     });
   });
 
+  it("merges canvas generator controls into image request params", async () => {
+    const calls: unknown[] = [];
+    const runners = createApiFlowRunners({
+      session: session(),
+      generateImage: async (request) => {
+        calls.push(request);
+        return { outputAssets: ["data:image/png;base64,aGVsbG8="], raw: { ok: true } };
+      }
+    });
+
+    await runners.api_text2img?.({
+      node: node("g1", "api_text2img", {
+        model: "m1",
+        resolution: "custom",
+        ratio: "wide",
+        count: 3,
+        customWidth: "1536",
+        customHeight: "864",
+        params: { seed: "42", steps: 12 }
+      }),
+      upstreamNodes: [node("p1", "prompt", { text: "hello prompt" })],
+      upstreamResults: []
+    });
+
+    expect(calls[0]).toMatchObject({
+      params: {
+        resolution: "custom",
+        ratio: "wide",
+        count: 3,
+        width: 1536,
+        height: 864,
+        seed: "42",
+        steps: 12
+      }
+    });
+  });
+
   it("runs inpaint with base and mask assets from node data", async () => {
     const calls: unknown[] = [];
     const s = session();

@@ -28,7 +28,7 @@ async function runApiText2Img(input: Parameters<FlowRunner>[0], options: ApiFlow
   const model = stringData(input.node, "model");
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
-  const params = recordData(input.node, "params");
+  const params = imageParamsFrom(input.node);
   const provider = await providerFrom(input.node, options);
   const result = await generate(options, {
     action: "text2img",
@@ -59,7 +59,7 @@ async function runApiImg2Img(input: Parameters<FlowRunner>[0], options: ApiFlowR
   const model = stringData(input.node, "model");
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
-  const params = recordData(input.node, "params");
+  const params = imageParamsFrom(input.node);
   const provider = await providerFrom(input.node, options);
   const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
 
@@ -94,7 +94,7 @@ async function runApiInpaint(input: Parameters<FlowRunner>[0], options: ApiFlowR
   const model = stringData(input.node, "model");
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
-  const params = recordData(input.node, "params");
+  const params = imageParamsFrom(input.node);
   const provider = await providerFrom(input.node, options);
   const base = findInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
   const mask = findAssetById(options.session, stringData(input.node, "maskAssetId"));
@@ -132,7 +132,7 @@ async function runApiVideo(input: Parameters<FlowRunner>[0], options: ApiFlowRun
   const model = stringData(input.node, "model");
   const prompt = promptFrom(input.upstreamNodes, input.node);
   const negativePrompt = optionalStringData(input.node, "negativePrompt");
-  const params = recordData(input.node, "params");
+  const params = imageParamsFrom(input.node);
   const provider = await providerFrom(input.node, options);
   const base = findOptionalInputAsset(options.session, input.upstreamNodes, input.upstreamResults, input.node, "baseAssetId");
 
@@ -250,6 +250,29 @@ function optionalStringData(node: FlowNode, key: string): string | undefined {
 function recordData(node: FlowNode, key: string): Record<string, unknown> | undefined {
   const value = node.data[key];
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function imageParamsFrom(node: FlowNode): Record<string, unknown> | undefined {
+  const params: Record<string, unknown> = { ...(recordData(node, "params") ?? {}) };
+  addOptionalStringParam(params, "resolution", node.data.resolution);
+  addOptionalStringParam(params, "ratio", node.data.ratio);
+  addOptionalNumberParam(params, "count", node.data.count);
+  addOptionalNumberParam(params, "width", node.data.customWidth);
+  addOptionalNumberParam(params, "height", node.data.customHeight);
+  return Object.keys(params).length ? params : undefined;
+}
+
+function addOptionalStringParam(params: Record<string, unknown>, key: string, value: unknown): void {
+  if (typeof value === "string" && value.trim()) {
+    params[key] = value.trim();
+  }
+}
+
+function addOptionalNumberParam(params: Record<string, unknown>, key: string, value: unknown): void {
+  const numeric = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (Number.isFinite(numeric)) {
+    params[key] = numeric;
+  }
 }
 
 function promptFrom(upstreamNodes: FlowNode[], node: FlowNode): string {

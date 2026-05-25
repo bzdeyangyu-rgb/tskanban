@@ -460,6 +460,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
             key={node.id}
             node={node}
             selected={selectedIds.includes(node.id)}
+            upstreamNodes={upstreamNodesFor(nodes, edges, node.id)}
             onData={updateNodeData}
             onFiles={(files) => onNodeFiles(node.id, files)}
             onLinkStart={(event) => {
@@ -548,7 +549,8 @@ function ReferenceNodeCard({
   onLinkStart,
   onResizeStart,
   onSelect,
-  selected
+  selected,
+  upstreamNodes
 }: {
   node: CanvasNode;
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
@@ -558,6 +560,7 @@ function ReferenceNodeCard({
   onResizeStart: (event: ReactPointerEvent) => void;
   onSelect: (event: ReactPointerEvent) => void;
   selected: boolean;
+  upstreamNodes: CanvasNode[];
 }) {
   const Icon = nodeIcon(node.type);
   const style = {
@@ -594,7 +597,7 @@ function ReferenceNodeCard({
         <strong>{nodeTitle(node.type)}</strong>
         <small>{node.status ?? "idle"}</small>
       </header>
-      <div className="reference-node-body">{renderNodeBody(node, onData, onFiles)}</div>
+      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles)}</div>
       {node.type !== "output" && node.type !== ("group" as CanvasNodeKind) ? (
         <button className="reference-node-port" type="button" title="拖出连线" onPointerDown={onLinkStart} />
       ) : null}
@@ -605,6 +608,7 @@ function ReferenceNodeCard({
 
 function renderNodeBody(
   node: CanvasNode,
+  upstreamNodes: CanvasNode[],
   onData: (nodeId: string, patch: Record<string, unknown>) => void,
   onFiles: (files: File[]) => void
 ) {
@@ -670,7 +674,7 @@ function renderNodeBody(
   }
 
   if (isApiImageNode(node.type)) {
-    return <ReferenceGeneratorBody node={node} onData={onData} />;
+    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} />;
   }
 
   if (node.type === "output") {
@@ -713,12 +717,15 @@ function renderNodeBody(
 
 function ReferenceGeneratorBody({
   node,
+  upstreamNodes,
   onData
 }: {
   node: CanvasNode;
+  upstreamNodes: CanvasNode[];
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
 }) {
-  const prompt = stringValue(node.data.prompt);
+  const inputSummary = generatorNodeInputSummary(node, upstreamNodes);
+  const prompt = inputSummary.prompt;
   const providerId = stringValue(node.data.providerId);
   const model = stringValue(node.data.model) || "gpt-image-2";
   const resolution = stringValue(node.data.resolution) || "1k";
@@ -726,25 +733,48 @@ function ReferenceGeneratorBody({
   const count = clamp(Number(node.data.count) || 1, 1, 8);
   const customWidth = stringValue(node.data.customWidth);
   const customHeight = stringValue(node.data.customHeight);
+  const negativePrompt = stringValue(node.data.negativePrompt);
+  const params = recordValue(node.data.params);
+  const seed = stringValue(params.seed);
   const showCustomSize = resolution === "custom" || ratio === "custom";
 
   const setCount = (next: number) => onData(node.id, { count: clamp(next, 1, 8) });
+  const setParam = (key: string, value: string | number) => onData(node.id, { params: { ...params, [key]: value } });
 
   return (
     <div className="reference-generator-body">
       <div className="reference-prompt-list">
         {prompt ? (
           <>
-            <span>Prompts</span>
+            <span>Prompt · {inputSummary.promptSource === node.id ? "本节点" : "连线"}</span>
             <p>{prompt}</p>
           </>
-        ) : null}
+        ) : (
+          <span>连接提示词，或在下方覆盖提示词</span>
+        )}
       </div>
       <div className="reference-generator-label">Images</div>
       <div className="reference-input-list">
-        <span>连接图片、Output 或分组后显示输入素材</span>
+        {inputSummary.images.length ? (
+          inputSummary.images.map((image) => (
+            <figure key={`${image.sourceNodeId}-${image.assetId}`}>
+              <img src={image.url} alt={image.name} />
+              <figcaption>{image.name}</figcaption>
+            </figure>
+          ))
+        ) : (
+          <span>连接图片、Output 或分组后显示输入素材</span>
+        )}
       </div>
       <div className="reference-gen-settings">
+        <label className="reference-gen-textarea">
+          <span>提示词覆盖</span>
+          <textarea value={stringValue(node.data.prompt)} onChange={(event) => onData(node.id, { prompt: event.target.value })} />
+        </label>
+        <label className="reference-gen-textarea">
+          <span>负面提示词</span>
+          <textarea value={negativePrompt} onChange={(event) => onData(node.id, { negativePrompt: event.target.value })} />
+        </label>
         <div className="reference-gen-row">
           <select value={providerId} onChange={(event) => onData(node.id, { providerId: event.target.value })}>
             <option value="">默认 API</option>
@@ -779,6 +809,16 @@ function ReferenceGeneratorBody({
               ›
             </button>
           </div>
+        </div>
+        <div className="reference-gen-row">
+          <label>
+            <span>Seed</span>
+            <input value={seed} placeholder="随机" onChange={(event) => setParam("seed", event.target.value)} />
+          </label>
+          <label>
+            <span>Batch</span>
+            <input value={count} inputMode="numeric" onChange={(event) => setCount(Number(event.target.value) || 1)} />
+          </label>
         </div>
         {showCustomSize ? (
           <div className="reference-gen-row">
@@ -1026,6 +1066,56 @@ export function promptGeneSourceFromNodes(
   return undefined;
 }
 
+export function upstreamNodesFor(nodes: readonly CanvasNode[], edges: readonly CanvasEdge[], nodeId: string): CanvasNode[] {
+  const upstreamIds = edges.filter((edge) => edge.to === nodeId).map((edge) => edge.from);
+  return upstreamIds
+    .map((id) => nodes.find((node) => node.id === id))
+    .filter((node): node is CanvasNode => Boolean(node));
+}
+
+export function generatorNodeInputSummary(
+  node: CanvasNode,
+  upstreamNodes: readonly CanvasNode[]
+): {
+  prompt: string;
+  promptSource?: string | undefined;
+  images: Array<{ assetId: string; url: string; name: string; sourceNodeId: string }>;
+} {
+  const directPrompt = stringValue(node.data.prompt).trim();
+  const promptNode = upstreamNodes.find((upstream) => ["prompt", "loop", "llm"].includes(upstream.type));
+  const upstreamPrompt = promptNode ? (stringValue(promptNode.data.text) || stringValue(promptNode.data.prompt)).trim() : "";
+
+  return {
+    prompt: directPrompt || upstreamPrompt,
+    promptSource: directPrompt ? node.id : promptNode?.id,
+    images: upstreamNodes.flatMap((upstream) => imageInputsFromNode(upstream))
+  };
+}
+
+function imageInputsFromNode(node: CanvasNode): Array<{ assetId: string; url: string; name: string; sourceNodeId: string }> {
+  if (node.type === "image" && stringValue(node.data.assetId) && stringValue(node.data.url)) {
+    return [
+      {
+        assetId: stringValue(node.data.assetId),
+        url: stringValue(node.data.url),
+        name: stringValue(node.data.name) || stringValue(node.data.assetId),
+        sourceNodeId: node.id
+      }
+    ];
+  }
+
+  if (node.type === "output" && Array.isArray(node.data.outputs)) {
+    return node.data.outputs.filter(isOutputAsset).map((asset) => ({
+      assetId: asset.assetId,
+      url: asset.url,
+      name: asset.assetId,
+      sourceNodeId: node.id
+    }));
+  }
+
+  return [];
+}
+
 export function workflowGeneSourceFromSelection(
   nodes: readonly CanvasNode[],
   edges: readonly CanvasEdge[],
@@ -1223,6 +1313,10 @@ function stringValue(value: unknown): string {
     return String(value);
   }
   return typeof value === "string" ? value : "";
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function isApiImageNode(type: CanvasNodeKind): boolean {

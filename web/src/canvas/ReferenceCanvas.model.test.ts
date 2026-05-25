@@ -6,6 +6,8 @@ import {
   importWorkflowGeneToCanvas,
   moveCanvasNodes,
   promptGeneSourceFromNodes,
+  generatorNodeInputSummary,
+  upstreamNodesFor,
   workflowGeneSourceFromSelection
 } from "./ReferenceCanvas";
 
@@ -44,6 +46,47 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(promptGeneSourceFromNodes(promptNodes, ["old"])).toEqual({ prompt: "旧提示词", sourceNodeId: "old" });
     expect(promptGeneSourceFromNodes(promptNodes, [])).toEqual({ prompt: "新提示词", sourceNodeId: "new" });
+  });
+
+  it("summarizes connected generator inputs from prompts, images, and outputs", () => {
+    const canvasNodes: CanvasNode[] = [
+      { id: "p", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: { text: "上游提示词" } },
+      { id: "img", type: "image", x: 0, y: 0, width: 100, height: 100, data: { assetId: "asset_base", url: "/base.png", name: "base.png" } },
+      {
+        id: "out",
+        type: "output",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        data: { outputs: [{ assetId: "asset_out", url: "/out.png" }] }
+      },
+      { id: "g", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: {} }
+    ];
+    const upstream = upstreamNodesFor(canvasNodes, [
+      { id: "e1", from: "p", to: "g" },
+      { id: "e2", from: "img", to: "g" },
+      { id: "e3", from: "out", to: "g" }
+    ], "g");
+
+    expect(generatorNodeInputSummary(canvasNodes[3], upstream)).toEqual({
+      prompt: "上游提示词",
+      promptSource: "p",
+      images: [
+        { assetId: "asset_base", url: "/base.png", name: "base.png", sourceNodeId: "img" },
+        { assetId: "asset_out", url: "/out.png", name: "asset_out", sourceNodeId: "out" }
+      ]
+    });
+  });
+
+  it("uses generator prompt overrides before connected prompt nodes", () => {
+    const summary = generatorNodeInputSummary(
+      { id: "g", type: "api_text2img", x: 0, y: 0, width: 100, height: 100, data: { prompt: "节点覆盖提示词" } },
+      [{ id: "p", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: { text: "上游提示词" } }]
+    );
+
+    expect(summary.prompt).toBe("节点覆盖提示词");
+    expect(summary.promptSource).toBe("g");
   });
 
   it("captures selected nodes and internal edges as a workflow gene", () => {
