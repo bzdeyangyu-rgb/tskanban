@@ -164,12 +164,7 @@ function NodeBody({
   if (nodeType === "comfy") {
     return (
       <div className="tshuabu-node-body node-editor-body api-node-form" onPointerDown={stopNodeControl}>
-        <NodeInput nodeId={nodeId} data={data} field="workflow" label="Workflow" placeholder="选择或填写 workflow" />
-        <textarea
-          value={stringValue(data.note)}
-          placeholder="ComfyUI 参数说明"
-          onChange={(event) => dispatchNodeData(nodeId, { note: event.target.value })}
-        />
+        <div className="node-empty-state">这个旧节点已停用，请改用 API 生成或图生图节点。</div>
       </div>
     );
   }

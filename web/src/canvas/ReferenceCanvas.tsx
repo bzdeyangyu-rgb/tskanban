@@ -1038,7 +1038,7 @@ export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeD
     case "video":
       return { type, title: "视频生成", data: { ...providerData, model: "" }, width: 330, height: 220 };
     case "comfy":
-      return { type, title: "ComfyUI", data: { workflow: "" }, width: 340, height: 230 };
+      return { type, title: "\u5df2\u505c\u7528\u8282\u70b9", data: { disabled: true }, width: 300, height: 160 };
     case "output":
       return { type, title: "Output", data: {}, width: 360, height: 250 };
     case "api_text2img":
@@ -1409,8 +1409,8 @@ function nodesOverlap(a: Pick<CanvasNode, "x" | "y" | "width" | "height">, b: Pi
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
-  if (["api_text2img", "api_img2img", "api_inpaint", "video", "comfy"].includes(type)) {
+export function linkOptions(type: CanvasNodeKind): Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> {
+  if (["api_text2img", "api_img2img", "api_inpaint", "video"].includes(type)) {
     return [{ type: "output", label: "Output", icon: CircleDot }];
   }
   return [
@@ -1448,7 +1448,7 @@ function nodeTitle(type: CanvasNodeKind): string {
     api_img2img: "图生图",
     api_inpaint: "局部重绘",
     video: "视频生成",
-    comfy: "ComfyUI",
+    comfy: "\u5df2\u505c\u7528\u8282\u70b9",
     output: "Output",
     group: "分组"
   };

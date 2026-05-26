@@ -128,7 +128,7 @@ const apiPageCopy: Record<
   zimage: {
     kicker: "Text to Image",
     title: "\u6587\u751f\u56fe",
-    description: "\u4fdd\u7559\u53c2\u8003\u9879\u76ee\u7684\u72ec\u7acb\u5165\u53e3\uff0c\u540e\u7eed\u76f4\u63a5\u8c03\u7528\u6211\u4eec\u7684\u56fe\u50cf\u751f\u6210 API\uff0c\u4e0d\u63a5 ComfyUI\u3002",
+    description: "\u4fdd\u7559\u53c2\u8003\u9879\u76ee\u7684\u72ec\u7acb\u5165\u53e3\uff0c\u540e\u7eed\u76f4\u63a5\u8c03\u7528\u6211\u4eec\u7684\u56fe\u50cf\u751f\u6210 API\uff0c\u4e0d\u4f9d\u8d56\u989d\u5916\u5de5\u4f5c\u6d41\u5de5\u5177\u3002",
     actions: ["\u63d0\u793a\u8bcd", "\u5c3a\u5bf8", "\u98ce\u683c", "\u751f\u6210"]
   },
   enhance: {
@@ -1647,7 +1647,6 @@ function linkCommandOptions(nodeType: CanvasNodeKind): Array<{ type: CanvasNodeK
   if (nodeType === "output") {
     return [
       { type: "image", label: "图片节点", icon: Image },
-      { type: "prompt", label: "提示词", icon: MessageSquare },
       { type: "prompt", label: "提示词", icon: MessageSquareText }
     ];
   }

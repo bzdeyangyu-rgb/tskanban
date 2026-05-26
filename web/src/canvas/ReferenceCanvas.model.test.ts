@@ -9,6 +9,7 @@ import {
   promptGeneSourceFromNodes,
   generatorNodeInputSummary,
   mergeOutputAssets,
+  linkOptions,
   outputNodeForAssets,
   selectedOutputAssetFromNode,
   upstreamNodesFor,
@@ -44,6 +45,13 @@ describe("ReferenceCanvas model helpers", () => {
 
   it("places the visible edge delete action at the link midpoint in screen space", () => {
     expect(edgeActionPosition(nodes[0], nodes[1], { x: 80, y: 40, zoom: 2 })).toEqual({ x: 330, y: 175 });
+  });
+
+  it("does not expose disabled workflow nodes in the link creation menu", () => {
+    const labels = linkOptions("prompt").map((option) => option.label);
+
+    expect(labels).toEqual(["提示词", "循环", "API生成", "图生图", "视频", "Output"]);
+    expect(labels).not.toContain("ComfyUI");
   });
 
   it("uses selected prompt before newest prompt for gene capture", () => {
