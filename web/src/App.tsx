@@ -65,6 +65,7 @@ import { ApiSettings } from "./panels/ApiSettings";
 import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { GeneLibraryPopover } from "./panels/GeneLibrary";
+import { featurePageConfig, managementStatsForFeature, type ApiFeaturePageId } from "./panels/studioFeatureModel";
 import {
   createPromptGene,
   createWorkflowGene,
@@ -163,7 +164,7 @@ const apiPageCopy: Record<
   }
 };
 
-type ApiPageKind = Exclude<StudioPageId, "canvas" | "api-settings">;
+type ApiPageKind = ApiFeaturePageId;
 
 const quickApiNodeType: Record<ApiPageKind, CanvasNodeKind> = {
   zimage: "api_text2img",
@@ -174,80 +175,6 @@ const quickApiNodeType: Record<ApiPageKind, CanvasNodeKind> = {
   "gpt-chat": "prompt"
 };
 
-const apiPageControls: Record<
-  ApiPageKind,
-  {
-    uploadLabel?: string;
-    promptLabel: string;
-    previewTitle: string;
-    managementTitle: string;
-    fields: Array<{ key: string; label: string; type: "text" | "select" | "range" | "number"; options?: string[]; defaultValue: string }>;
-  }
-> = {
-  zimage: {
-    promptLabel: "输入提示词",
-    previewTitle: "生成预览",
-    managementTitle: "批量管理 / 版本管理",
-    fields: [
-      { key: "size", label: "尺寸", type: "select", options: ["1024x1024", "1024x1536", "1536x1024", "768x1344"], defaultValue: "1024x1024" },
-      { key: "batch", label: "批量", type: "number", defaultValue: "1" },
-      { key: "style", label: "风格", type: "text", defaultValue: "" }
-    ]
-  },
-  enhance: {
-    uploadLabel: "输入图片",
-    promptLabel: "增强说明",
-    previewTitle: "画布预览",
-    managementTitle: "增强记录管理",
-    fields: [
-      { key: "strength", label: "增强程度", type: "range", defaultValue: "60" },
-      { key: "scale", label: "放大倍率", type: "select", options: ["1x", "2x", "4x"], defaultValue: "2x" },
-      { key: "detail", label: "细节保真", type: "range", defaultValue: "70" }
-    ]
-  },
-  klein: {
-    uploadLabel: "参考图片",
-    promptLabel: "输入提示词",
-    previewTitle: "编辑预览",
-    managementTitle: "图片编辑管理",
-    fields: [
-      { key: "mask", label: "蒙版模式", type: "select", options: ["自动识别", "手动蒙版", "全图编辑"], defaultValue: "自动识别" },
-      { key: "strength", label: "编辑强度", type: "range", defaultValue: "55" },
-      { key: "reference", label: "参考权重", type: "range", defaultValue: "65" }
-    ]
-  },
-  angle: {
-    uploadLabel: "输入图片",
-    promptLabel: "角度说明",
-    previewTitle: "结果预览",
-    managementTitle: "角度版本管理",
-    fields: [
-      { key: "camera", label: "相机控制", type: "select", options: ["正面", "左 45°", "右 45°", "俯视", "低角度"], defaultValue: "左 45°" },
-      { key: "focal", label: "焦距", type: "select", options: ["24mm", "35mm", "50mm", "85mm"], defaultValue: "35mm" },
-      { key: "strength", label: "参数强度", type: "range", defaultValue: "50" }
-    ]
-  },
-  online: {
-    promptLabel: "在线提示词",
-    previewTitle: "在线结果",
-    managementTitle: "在线任务管理",
-    fields: [
-      { key: "source", label: "平台", type: "select", options: ["API Provider", "远程队列"], defaultValue: "API Provider" },
-      { key: "size", label: "尺寸", type: "select", options: ["1024x1024", "1024x1536", "1536x1024"], defaultValue: "1024x1024" },
-      { key: "batch", label: "批量", type: "number", defaultValue: "1" }
-    ]
-  },
-  "gpt-chat": {
-    promptLabel: "对话输入",
-    previewTitle: "回复预览",
-    managementTitle: "会话管理",
-    fields: [
-      { key: "mode", label: "模式", type: "select", options: ["提示词优化", "创意讨论", "流程建议"], defaultValue: "提示词优化" },
-      { key: "context", label: "上下文", type: "text", defaultValue: "" },
-      { key: "temperature", label: "发散程度", type: "range", defaultValue: "50" }
-    ]
-  }
-};
 export function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const canvasRef = useRef<ReferenceCanvasHandle | null>(null);
@@ -1072,7 +999,8 @@ function StudioApiPage({
   const [message, setMessage] = useState("");
   const [outputs, setOutputs] = useState<Array<{ assetId: string; url: string }>>([]);
   const [chatReply, setChatReply] = useState("");
-  const controls = apiPageControls[pageId];
+  const controls = featurePageConfig(pageId);
+  const managementStats = managementStatsForFeature(pageId);
   const [controlValues, setControlValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(controls.fields.map((field) => [field.key, field.defaultValue]))
   );
@@ -1087,6 +1015,15 @@ function StudioApiPage({
   const setControl = (key: string, value: string) => {
     setControlValues((current) => ({ ...current, [key]: value }));
   };
+
+  useEffect(() => {
+    setControlValues(Object.fromEntries(controls.fields.map((field) => [field.key, field.defaultValue])));
+    setFile(null);
+    setOutputs([]);
+    setChatReply("");
+    setNegativePrompt("");
+    setMessage("");
+  }, [controls, pageId]);
 
   const handleRunQuickTask = async () => {
     setMessage("");
@@ -1160,18 +1097,23 @@ function StudioApiPage({
                 placeholder={pageId === "gpt-chat" ? "输入对话内容" : "输入提示词或编辑指令"}
               />
             </label>
-            <label className="studio-form-label">
-              负面提示词
-              <input
-                value={negativePrompt}
-                onChange={(event) => setNegativePrompt(event.target.value)}
-                placeholder="可选"
-              />
-            </label>
+            {controls.hasNegativePrompt ? (
+              <label className="studio-form-label">
+                负面提示词
+                <input
+                  value={negativePrompt}
+                  onChange={(event) => setNegativePrompt(event.target.value)}
+                  placeholder="可选"
+                />
+              </label>
+            ) : null}
             <div className="studio-param-grid">
               {controls.fields.map((field) => (
                 <label className="studio-param-field" key={field.key}>
-                  <span>{field.label}</span>
+                  <span>
+                    {field.label}
+                    {field.type === "range" ? <b>{controlValues[field.key] ?? field.defaultValue}</b> : null}
+                  </span>
                   {field.type === "select" ? (
                     <select value={controlValues[field.key] ?? field.defaultValue} onChange={(event) => setControl(field.key, event.target.value)}>
                       {field.options?.map((option) => (
@@ -1219,9 +1161,11 @@ function StudioApiPage({
         </div>
         <div className="studio-management-panel">
           <strong>{controls.managementTitle}</strong>
-          <span>当前版本 0</span>
-          <span>批量队列 0</span>
-          <span>历史记录 0</span>
+          {managementStats.map((item) => (
+            <span key={item.label}>
+              {item.label} {item.value}
+            </span>
+          ))}
         </div>
         <button type="button" className="studio-feature-primary" disabled={running} onClick={handleRunQuickTask}>
           {running ? <RefreshCw aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}

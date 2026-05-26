@@ -2085,6 +2085,24 @@ button {
   font-weight: 800;
 }
 
+.studio-param-field > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studio-param-field b {
+  min-width: 28px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #d8dee9;
+  background: #0b111a;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
 .studio-feature-form textarea,
 .studio-feature-form input:not([type="file"]),
 .studio-feature-form select,
