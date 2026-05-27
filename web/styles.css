@@ -3328,11 +3328,47 @@ button {
   white-space: nowrap;
 }
 
-.reference-image-drop input {
+.reference-image-actions {
   position: absolute;
-  inset: 0;
-  opacity: 0;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.reference-image-actions button,
+.reference-image-import {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(216, 222, 233, 0.2);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #e5e9f0;
+  background: rgba(11, 17, 26, 0.82);
+  font-size: 11px;
+  font-weight: 900;
   cursor: pointer;
+}
+
+.reference-image-actions button:hover,
+.reference-image-import:hover {
+  color: #0f172a;
+  background: #d8dee9;
+  border-color: #d8dee9;
+}
+
+.reference-image-import {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 2;
+}
+
+.reference-image-import input {
+  display: none;
 }
 
 .reference-prompt-field {

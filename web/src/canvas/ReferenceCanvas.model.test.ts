@@ -4,6 +4,7 @@ import {
   collectDragNodeIds,
   deleteCanvasSelection,
   edgeActionPosition,
+  imageEditNodeDefinition,
   importWorkflowGeneToCanvas,
   moveCanvasNodes,
   promptGeneSourceFromNodes,
@@ -105,6 +106,30 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(summary.prompt).toBe("上游提示词");
     expect(summary.promptSource).toBe("p");
+  });
+
+  it("creates an image edit node definition from an imported image", () => {
+    expect(
+      imageEditNodeDefinition({
+        id: "img1",
+        type: "image",
+        x: 40,
+        y: 80,
+        width: 280,
+        height: 240,
+        data: { assetId: "asset_base", url: "/base.png", name: "base.png" }
+      })
+    ).toMatchObject({
+      type: "api_inpaint",
+      title: "图片编辑",
+      data: {
+        sourceNodeId: "img1",
+        assetId: "asset_base",
+        url: "/base.png",
+        name: "base.png",
+        prompt: ""
+      }
+    });
   });
 
   it("merges output assets without duplicating existing results", () => {

@@ -46,6 +46,11 @@ export type ReferenceCanvasHandle = {
   hasNodes: () => boolean;
 };
 
+type ImageEditRequest = {
+  sourceNode: CanvasNode;
+  definition: NodeDefinition;
+};
+
 type ReferenceCanvasProps = {
   defaultProviderId?: string;
   onFiles: (files: File[]) => void;
@@ -536,6 +541,14 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
               ]);
               onStatus(`已回填 ${asset.assetId} 为图片节点`);
             }}
+            onImageEdit={(request) => {
+              const editId = addNode(request.definition, {
+                x: request.sourceNode.x + request.sourceNode.width + 46,
+                y: request.sourceNode.y,
+                connectFrom: request.sourceNode.id
+              });
+              onStatus(`已创建图片编辑节点：${editId}`);
+            }}
             onLinkStart={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -622,6 +635,7 @@ function ReferenceNodeCard({
   onData,
   onDragStart,
   onFiles,
+  onImageEdit,
   onImageFromAsset,
   onLinkStart,
   onResizeStart,
@@ -635,6 +649,7 @@ function ReferenceNodeCard({
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
   onDragStart: (event: ReactPointerEvent) => void;
   onFiles: (files: File[]) => void;
+  onImageEdit: (request: ImageEditRequest) => void;
   onImageFromAsset: (asset: { assetId: string; url: string }) => void;
   onLinkStart: (event: ReactPointerEvent) => void;
   onResizeStart: (event: ReactPointerEvent) => void;
@@ -678,7 +693,9 @@ function ReferenceNodeCard({
         <strong>{nodeTitle(node.type)}</strong>
         <small>{node.status ?? "idle"}</small>
       </header>
-      <div className="reference-node-body">{renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset, hasConnectedOutput)}</div>
+      <div className="reference-node-body">
+        {renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset, onImageEdit, hasConnectedOutput)}
+      </div>
       {node.type !== "output" && node.type !== ("group" as CanvasNodeKind) ? (
         <button className="reference-node-port" type="button" title="拖出连线" onPointerDown={onLinkStart} />
       ) : null}
@@ -694,30 +711,48 @@ function renderNodeBody(
   onFiles: (files: File[]) => void,
   onRunNode: () => void,
   onImageFromAsset: (asset: { assetId: string; url: string }) => void,
+  onImageEdit: (request: ImageEditRequest) => void,
   hasConnectedOutput: boolean
 ) {
   if (node.type === "image") {
     const url = stringValue(node.data.url);
     return (
-      <label
+      <div
         className={`reference-image-drop ${url ? "has-image" : ""}`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
         {url ? <img src={url} alt={stringValue(node.data.name) || "image"} /> : <span>点击或拖入图片</span>}
         {url ? <em>{stringValue(node.data.name) || "已导入图片"}</em> : null}
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          aria-label="导入图片"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            onFiles(Array.from(event.target.files ?? []));
-            event.currentTarget.value = "";
-          }}
-        />
-      </label>
+        {url ? (
+          <div className="reference-image-actions">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onImageEdit({ sourceNode: node, definition: imageEditNodeDefinition(node) });
+              }}
+            >
+              <Edit3 aria-hidden="true" size={14} />
+              编辑图片
+            </button>
+          </div>
+        ) : null}
+        <label className="reference-image-import">
+          <span>{url ? "替换图片" : "导入图片"}</span>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            aria-label="导入图片"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              onFiles(Array.from(event.target.files ?? []));
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+      </div>
     );
   }
 
@@ -1044,6 +1079,28 @@ export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeD
     default:
       return { type: "api_text2img", title: "API生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
   }
+}
+
+export function imageEditNodeDefinition(sourceNode: CanvasNode, providerId?: string): NodeDefinition {
+  const providerData = providerId ? { providerId } : {};
+  return {
+    type: "api_inpaint",
+    title: "图片编辑",
+    data: {
+      ...providerData,
+      model: "gpt-image-2",
+      resolution: "1k",
+      ratio: "square",
+      count: 1,
+      sourceNodeId: sourceNode.id,
+      assetId: stringValue(sourceNode.data.assetId),
+      url: stringValue(sourceNode.data.url),
+      name: stringValue(sourceNode.data.name),
+      prompt: ""
+    },
+    width: 380,
+    height: 360
+  };
 }
 
 function nodeMeta(node: CanvasNode): TshuabuNodeMeta {
