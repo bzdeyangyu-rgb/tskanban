@@ -354,20 +354,19 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         if (assets.length === 0) {
           return false;
         }
-        const output = outputNodeForAssets(nodes, edges, sourceNodeId);
-        if (!output) {
+        const result = placeOutputAssetsOnCanvas(
+          nodes,
+          edges,
+          assets,
+          sourceNodeId,
+          `output_${Date.now().toString(36)}_${nodeCounterRef.current++}`
+        );
+        if (!result.outputId) {
           return false;
         }
-        const existing = Array.isArray(output.data.outputs) ? output.data.outputs.filter(isOutputAsset) : [];
-        const nextOutputs = mergeOutputAssets(existing, assets);
-        setNodes((current) =>
-          current.map((node) =>
-            node.id === output.id
-              ? { ...node, status: "success", data: { ...node.data, outputs: nextOutputs, selectedOutputAssetId: assets[0]?.assetId } }
-              : node
-          )
-        );
-        setSelectedIds([output.id]);
+        setNodes(result.nodes);
+        setEdges(result.edges);
+        setSelectedIds([result.outputId]);
         return true;
       },
       selectedOutputAsset: () => {
@@ -1223,6 +1222,61 @@ export function outputNodeForAssets(
   }
 
   return nodes.find((node) => node.type === "output");
+}
+
+export function placeOutputAssetsOnCanvas(
+  nodes: readonly CanvasNode[],
+  edges: readonly CanvasEdge[],
+  assets: Array<{ assetId: string; url: string }>,
+  sourceNodeId: string | undefined,
+  outputId: string
+): { nodes: CanvasNode[]; edges: CanvasEdge[]; outputId?: string; created: boolean } {
+  if (assets.length === 0) {
+    return { nodes: [...nodes], edges: [...edges], created: false };
+  }
+
+  const existingOutput = outputNodeForAssets(nodes, edges, sourceNodeId);
+  if (existingOutput) {
+    const existing = Array.isArray(existingOutput.data.outputs) ? existingOutput.data.outputs.filter(isOutputAsset) : [];
+    const nextOutputs = mergeOutputAssets(existing, assets);
+    return {
+      nodes: nodes.map((node) =>
+        node.id === existingOutput.id
+          ? { ...node, status: "success", data: { ...node.data, outputs: nextOutputs, selectedOutputAssetId: assets[0]?.assetId } }
+          : { ...node }
+      ),
+      edges: edges.map((edge) => ({ ...edge })),
+      outputId: existingOutput.id,
+      created: false
+    };
+  }
+
+  const sourceNode = sourceNodeId ? nodes.find((node) => node.id === sourceNodeId && isApiImageNode(node.type)) : undefined;
+  if (!sourceNode) {
+    return { nodes: nodes.map((node) => ({ ...node })), edges: edges.map((edge) => ({ ...edge })), created: false };
+  }
+
+  const outputNode: CanvasNode = {
+    id: outputId,
+    type: "output",
+    x: sourceNode.x + sourceNode.width + 60,
+    y: sourceNode.y,
+    width: 360,
+    height: 250,
+    status: "success",
+    data: {
+      outputs: assets,
+      selectedOutputAssetId: assets[0]?.assetId,
+      roleTag: "自动承接"
+    }
+  };
+
+  return {
+    nodes: [...nodes.map((node) => ({ ...node })), outputNode],
+    edges: [...edges.map((edge) => ({ ...edge })), { id: `${outputId}_edge`, from: sourceNode.id, to: outputId }],
+    outputId,
+    created: true
+  };
 }
 
 export function hasConnectedOutput(nodes: readonly CanvasNode[], edges: readonly CanvasEdge[], sourceNodeId: string): boolean {

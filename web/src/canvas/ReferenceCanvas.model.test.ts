@@ -11,6 +11,7 @@ import {
   mergeOutputAssets,
   linkOptions,
   outputNodeForAssets,
+  placeOutputAssetsOnCanvas,
   selectedOutputAssetFromNode,
   upstreamNodesFor,
   hasConnectedOutput,
@@ -168,6 +169,51 @@ describe("ReferenceCanvas model helpers", () => {
     ];
 
     expect(outputNodeForAssets(canvasNodes, [], "g1")?.id).toBe("o1");
+  });
+
+  it("creates a connected output node when a generator run has no output target", () => {
+    const result = placeOutputAssetsOnCanvas(
+      [{ id: "g1", type: "api_text2img", x: 40, y: 50, width: 120, height: 100, data: {} }],
+      [],
+      [{ assetId: "asset_1", url: "/asset_1.png" }],
+      "g1",
+      "output_new"
+    );
+
+    expect(result.outputId).toBe("output_new");
+    expect(result.created).toBe(true);
+    expect(result.edges).toEqual([{ id: "output_new_edge", from: "g1", to: "output_new" }]);
+    expect(result.nodes.find((node) => node.id === "output_new")).toMatchObject({
+      type: "output",
+      x: 220,
+      y: 50,
+      data: {
+        outputs: [{ assetId: "asset_1", url: "/asset_1.png" }],
+        selectedOutputAssetId: "asset_1"
+      }
+    });
+  });
+
+  it("writes generator results into the connected output without creating another one", () => {
+    const result = placeOutputAssetsOnCanvas(
+      [
+        { id: "g1", type: "api_text2img", x: 0, y: 0, width: 120, height: 100, data: {} },
+        { id: "o1", type: "output", x: 200, y: 0, width: 120, height: 100, data: { outputs: [{ assetId: "old", url: "/old.png" }] } }
+      ],
+      [{ id: "e1", from: "g1", to: "o1" }],
+      [{ assetId: "new", url: "/new.png" }],
+      "g1",
+      "output_new"
+    );
+
+    expect(result.created).toBe(false);
+    expect(result.outputId).toBe("o1");
+    expect(result.nodes).toHaveLength(2);
+    expect(result.edges).toEqual([{ id: "e1", from: "g1", to: "o1" }]);
+    expect(result.nodes.find((node) => node.id === "o1")?.data.outputs).toEqual([
+      { assetId: "old", url: "/old.png" },
+      { assetId: "new", url: "/new.png" }
+    ]);
   });
 
   it("detects whether a generator has a connected output", () => {
