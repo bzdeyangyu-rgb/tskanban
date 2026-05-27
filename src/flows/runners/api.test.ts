@@ -204,4 +204,37 @@ describe("api flow runners", () => {
       parentAssetIds: ["base1"]
     });
   });
+
+  it("runs img2img with the selected asset from an upstream output node", async () => {
+    const calls: unknown[] = [];
+    const s = session();
+    const runners = createApiFlowRunners({
+      session: s,
+      generateImage: async (request) => {
+        calls.push(request);
+        return { outputAssets: ["https://example.com/output-reference.png"], raw: { ok: true } };
+      }
+    });
+
+    await runners.api_img2img?.({
+      node: node("g1", "api_img2img", { model: "m1" }),
+      upstreamNodes: [
+        node("out1", "output", {
+          selectedOutputAssetId: "base1",
+          outputs: [{ assetId: "base1", url: "/outputs/base.png" }]
+        }),
+        node("p1", "prompt", { text: "continue this image" })
+      ],
+      upstreamResults: []
+    });
+
+    expect(calls[0]).toMatchObject({
+      action: "img2img",
+      inputImage: "D:/tmp/base.png"
+    });
+    expect(s.versions[0]).toMatchObject({
+      action: "img2img",
+      parentAssetIds: ["base1"]
+    });
+  });
 });

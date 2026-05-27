@@ -869,6 +869,7 @@ export function App() {
                     <ReferenceCanvas
                       ref={canvasRef}
                       defaultProviderId={providers[0]?.id}
+                      providers={providers}
                       onFiles={handleImportFiles}
                       onNodeFiles={handleImportFilesToNode}
                       onRunNode={(nodeId) => void handleRun(nodeId)}

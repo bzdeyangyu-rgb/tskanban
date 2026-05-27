@@ -307,12 +307,45 @@ function findInputAsset(
     return findAssetById(session, upstreamImageAssetId);
   }
 
+  const upstreamOutputAssetId = upstreamNodes.map(outputAssetIdFromNode).find((assetId): assetId is string => Boolean(assetId));
+  if (upstreamOutputAssetId) {
+    return findAssetById(session, upstreamOutputAssetId);
+  }
+
   const upstreamGeneratedAssetId = upstreamResults.flatMap((result) => result.outputAssetIds)[0];
   if (upstreamGeneratedAssetId) {
     return findAssetById(session, upstreamGeneratedAssetId);
   }
 
   throw new Error(`${node.id} requires an input image asset`);
+}
+
+function outputAssetIdFromNode(node: FlowNode): string | undefined {
+  if (node.type !== "output") {
+    return undefined;
+  }
+
+  const outputs = Array.isArray(node.data.outputs) ? node.data.outputs : [];
+  const selectedId = optionalStringData(node, "selectedOutputAssetId");
+  if (selectedId && outputs.some((output) => outputHasAssetId(output, selectedId))) {
+    return selectedId;
+  }
+
+  for (let index = outputs.length - 1; index >= 0; index -= 1) {
+    const output = outputs[index];
+    if (output && typeof output === "object") {
+      const assetId = (output as { assetId?: unknown }).assetId;
+      if (typeof assetId === "string" && assetId.trim()) {
+        return assetId.trim();
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function outputHasAssetId(output: unknown, assetId: string): boolean {
+  return Boolean(output && typeof output === "object" && (output as { assetId?: unknown }).assetId === assetId);
 }
 
 function findOptionalInputAsset(

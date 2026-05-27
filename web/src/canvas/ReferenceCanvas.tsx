@@ -25,6 +25,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent
 } from "react";
+import type { ApiProvider } from "../api/client";
 import type { CanvasEdge, CanvasNode, CanvasNodeKind, CanvasNodeStatus, CanvasSnapshot } from "./flowTypes";
 import type { NodeDefinition, TshuabuNodeMeta } from "./shapeUtils";
 
@@ -53,6 +54,7 @@ type ImageEditRequest = {
 
 type ReferenceCanvasProps = {
   defaultProviderId?: string;
+  providers?: ApiProvider[];
   onFiles: (files: File[]) => void;
   onNodeFiles: (nodeId: string, files: File[]) => void;
   onRunNode: (nodeId: string) => void;
@@ -73,7 +75,7 @@ const MIN_NODE_WIDTH = 220;
 const MIN_NODE_HEIGHT = 126;
 
 export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvasProps>(function ReferenceCanvas(
-  { defaultProviderId, onFiles, onNodeFiles, onRunNode, onSelectionChange, onStatus },
+  { defaultProviderId, providers = [], onFiles, onNodeFiles, onRunNode, onSelectionChange, onStatus },
   ref
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -520,6 +522,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
           <ReferenceNodeCard
             key={node.id}
             node={node}
+            providers={providers}
             selected={selectedIds.includes(node.id)}
             upstreamNodes={upstreamNodesFor(nodes, edges, node.id)}
             onData={updateNodeData}
@@ -641,6 +644,7 @@ function ReferenceNodeCard({
   onResizeStart,
   onRunNode,
   onSelect,
+  providers,
   selected,
   upstreamNodes
 }: {
@@ -655,6 +659,7 @@ function ReferenceNodeCard({
   onResizeStart: (event: ReactPointerEvent) => void;
   onRunNode: () => void;
   onSelect: (event: ReactPointerEvent) => void;
+  providers: ApiProvider[];
   selected: boolean;
   upstreamNodes: CanvasNode[];
 }) {
@@ -694,7 +699,7 @@ function ReferenceNodeCard({
         <small>{node.status ?? "idle"}</small>
       </header>
       <div className="reference-node-body">
-        {renderNodeBody(node, upstreamNodes, onData, onFiles, onRunNode, onImageFromAsset, onImageEdit, hasConnectedOutput)}
+        {renderNodeBody(node, upstreamNodes, providers, onData, onFiles, onRunNode, onImageFromAsset, onImageEdit, hasConnectedOutput)}
       </div>
       {node.type !== "output" && node.type !== ("group" as CanvasNodeKind) ? (
         <button className="reference-node-port" type="button" title="拖出连线" onPointerDown={onLinkStart} />
@@ -707,6 +712,7 @@ function ReferenceNodeCard({
 function renderNodeBody(
   node: CanvasNode,
   upstreamNodes: CanvasNode[],
+  providers: ApiProvider[],
   onData: (nodeId: string, patch: Record<string, unknown>) => void,
   onFiles: (files: File[]) => void,
   onRunNode: () => void,
@@ -793,7 +799,16 @@ function renderNodeBody(
   }
 
   if (isApiImageNode(node.type)) {
-    return <ReferenceGeneratorBody node={node} upstreamNodes={upstreamNodes} onData={onData} onRunNode={onRunNode} hasConnectedOutput={hasConnectedOutput} />;
+    return (
+      <ReferenceGeneratorBody
+        node={node}
+        providers={providers}
+        upstreamNodes={upstreamNodes}
+        onData={onData}
+        onRunNode={onRunNode}
+        hasConnectedOutput={hasConnectedOutput}
+      />
+    );
   }
 
   if (node.type === "output") {
@@ -845,12 +860,14 @@ function renderNodeBody(
 function ReferenceGeneratorBody({
   node,
   hasConnectedOutput,
+  providers,
   upstreamNodes,
   onData,
   onRunNode
 }: {
   node: CanvasNode;
   hasConnectedOutput: boolean;
+  providers: ApiProvider[];
   upstreamNodes: CanvasNode[];
   onData: (nodeId: string, patch: Record<string, unknown>) => void;
   onRunNode: () => void;
@@ -859,6 +876,9 @@ function ReferenceGeneratorBody({
   const prompt = inputSummary.prompt;
   const providerId = stringValue(node.data.providerId);
   const model = stringValue(node.data.model) || "gpt-image-2";
+  const providerOptions = enabledGeneratorProviders(providers);
+  const baseModelOptions = generatorModelOptions(providers, providerId, node.type);
+  const modelOptions = model && !baseModelOptions.includes(model) ? [model, ...baseModelOptions] : baseModelOptions;
   const resolution = stringValue(node.data.resolution) || "1k";
   const ratio = stringValue(node.data.ratio) || "square";
   const count = clamp(Number(node.data.count) || 1, 1, 8);
@@ -869,7 +889,11 @@ function ReferenceGeneratorBody({
   const showCustomSize = resolution === "custom" || ratio === "custom";
 
   const setCount = (next: number) => onData(node.id, { count: clamp(next, 1, 8) });
-  const setParam = (key: string, value: string | number) => onData(node.id, { params: { ...params, [key]: value } });
+  const setParam = (key: string, value: string | number) => onData(node.id, { params: mergeGeneratorParam(params, key, value) });
+  const setProvider = (nextProviderId: string) => {
+    const [nextModel] = generatorModelOptions(providers, nextProviderId, node.type);
+    onData(node.id, { providerId: nextProviderId, model: nextModel || model });
+  };
 
   return (
     <div className="reference-generator-body">
@@ -898,12 +922,21 @@ function ReferenceGeneratorBody({
       </div>
       <div className="reference-gen-settings">
         <div className="reference-gen-row">
-          <select value={providerId} onChange={(event) => onData(node.id, { providerId: event.target.value })}>
+          <select value={providerId} onChange={(event) => setProvider(event.target.value)}>
             <option value="">默认 API</option>
-            <option value="openai">OpenAI</option>
-            <option value="apimart">APIMart</option>
+            {providerOptions.map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {provider.label}
+              </option>
+            ))}
           </select>
-          <input value={model} onChange={(event) => onData(node.id, { model: event.target.value })} />
+          <select value={model} onChange={(event) => onData(node.id, { model: event.target.value })}>
+            {modelOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="reference-gen-row">
           <select value={resolution} onChange={(event) => onData(node.id, { resolution: event.target.value })}>
@@ -935,10 +968,18 @@ function ReferenceGeneratorBody({
         <div className="reference-gen-row">
           <label>
             <span>Seed</span>
-            <input value={seed} placeholder="随机" onChange={(event) => setParam("seed", event.target.value)} />
+            <div className="reference-seed-control">
+              <input value={seed} placeholder="随机" onChange={(event) => setParam("seed", event.target.value)} />
+              <button type="button" onClick={() => setParam("seed", nextRandomSeed())}>
+                随机
+              </button>
+              <button type="button" onClick={() => setParam("seed", "")}>
+                清空
+              </button>
+            </div>
           </label>
           <label>
-            <span>Batch</span>
+            <span>重复</span>
             <input value={count} inputMode="numeric" onChange={(event) => setCount(Number(event.target.value) || 1)} />
           </label>
         </div>
@@ -1248,6 +1289,36 @@ export function generatorNodeInputSummary(
     promptSource: upstreamPrompt ? promptNode?.id : directPrompt ? node.id : undefined,
     images: upstreamNodes.flatMap((upstream) => imageInputsFromNode(upstream))
   };
+}
+
+export function enabledGeneratorProviders(providers: readonly ApiProvider[]): Array<{ id: string; label: string }> {
+  return providers.filter((provider) => provider.enabled).map((provider) => ({ id: provider.id, label: provider.name || provider.id }));
+}
+
+export function generatorModelOptions(providers: readonly ApiProvider[], providerId: string, type: CanvasNodeKind): string[] {
+  const enabled = providers.filter((provider) => provider.enabled);
+  const selected = enabled.find((provider) => provider.id === providerId) ?? enabled.find((provider) => provider.primary) ?? enabled[0];
+  const models = type === "video" ? selected?.videoModels : selected?.imageModels;
+  const filtered = (models ?? []).map((model) => model.trim()).filter(Boolean);
+  return filtered.length ? Array.from(new Set(filtered)) : ["gpt-image-2"];
+}
+
+export function mergeGeneratorParam(
+  params: Record<string, unknown>,
+  key: string,
+  value: string | number
+): Record<string, unknown> {
+  const next = { ...params };
+  if (typeof value === "string" && value.trim() === "") {
+    delete next[key];
+    return next;
+  }
+  next[key] = value;
+  return next;
+}
+
+export function nextRandomSeed(random: () => number = Math.random): string {
+  return String(Math.floor(random() * 1_000_000_000));
 }
 
 export function mergeOutputAssets(

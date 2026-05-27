@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
+import type { ApiProvider } from "../api/client";
 import type { CanvasNode } from "./flowTypes";
 import {
   collectDragNodeIds,
   deleteCanvasSelection,
   edgeActionPosition,
+  enabledGeneratorProviders,
   imageEditNodeDefinition,
   importWorkflowGeneToCanvas,
   moveCanvasNodes,
   promptGeneSourceFromNodes,
+  generatorModelOptions,
   generatorNodeInputSummary,
+  mergeGeneratorParam,
   mergeOutputAssets,
+  nextRandomSeed,
   linkOptions,
   outputNodeForAssets,
   placeOutputAssetsOnCanvas,
@@ -25,7 +30,46 @@ const nodes: CanvasNode[] = [
   { id: "g", type: "group", x: 0, y: 0, width: 300, height: 160, data: { childIds: ["a", "b"] } }
 ];
 
+const provider = (patch: Partial<ApiProvider> & Pick<ApiProvider, "id" | "name">): ApiProvider => ({
+  id: patch.id,
+  name: patch.name,
+  baseUrl: patch.baseUrl ?? "https://api.example.test",
+  protocol: patch.protocol ?? "openai",
+  enabled: patch.enabled ?? true,
+  primary: patch.primary ?? false,
+  imageModels: patch.imageModels ?? [],
+  chatModels: patch.chatModels ?? [],
+  videoModels: patch.videoModels ?? [],
+  hasKey: patch.hasKey ?? true,
+  keyPreview: patch.keyPreview ?? "sk-***"
+});
+
 describe("ReferenceCanvas model helpers", () => {
+  it("lists only enabled API providers for generator nodes", () => {
+    expect(
+      enabledGeneratorProviders([
+        provider({ id: "openai", name: "OpenAI" }),
+        provider({ id: "off", name: "已停用", enabled: false })
+      ])
+    ).toEqual([{ id: "openai", label: "OpenAI" }]);
+  });
+
+  it("uses the selected API provider image models for image generators", () => {
+    const providers = [
+      provider({ id: "primary", name: "主 API", primary: true, imageModels: ["primary-image"] }),
+      provider({ id: "apimart", name: "APIMart", imageModels: ["seedream", "flux"] })
+    ];
+
+    expect(generatorModelOptions(providers, "apimart", "api_img2img")).toEqual(["seedream", "flux"]);
+    expect(generatorModelOptions(providers, "", "api_img2img")).toEqual(["primary-image"]);
+  });
+
+  it("updates seed params without leaving an empty seed behind", () => {
+    expect(mergeGeneratorParam({ seed: "42", steps: 18 }, "seed", "")).toEqual({ steps: 18 });
+    expect(mergeGeneratorParam({}, "seed", "123")).toEqual({ seed: "123" });
+    expect(nextRandomSeed(() => 0.123456789)).toBe("123456789");
+  });
+
   it("drags group children with the group frame", () => {
     expect(collectDragNodeIds(nodes, ["g"], "g")).toEqual(["g", "a", "b"]);
   });

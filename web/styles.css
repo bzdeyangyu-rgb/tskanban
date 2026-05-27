@@ -3586,6 +3586,29 @@ button {
   padding: 0 10px;
 }
 
+.reference-seed-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
+  gap: 5px;
+}
+
+.reference-seed-control button {
+  height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  color: #d8dee9;
+  background: #111827;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.reference-seed-control button:hover {
+  background: #202838;
+}
+
 .reference-gen-stepper {
   flex: 0 0 94px;
   height: 32px;

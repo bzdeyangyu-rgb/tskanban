@@ -123,7 +123,7 @@ export function buildImageApiCall(input: {
   const protocol = input.protocol ?? "openai";
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   const action = input.request.action;
-  const endpoint = action === "video" ? "/videos/generations" : "/images/generations";
+  const endpoint = openAiCompatibleEndpoint(action);
   const payload =
     protocol === "openai" || protocol === "apimart"
       ? buildOpenAiCompatiblePayload(input.request)
@@ -134,6 +134,16 @@ export function buildImageApiCall(input: {
     payload,
     headers: buildHeaders(input.apiKey)
   };
+}
+
+function openAiCompatibleEndpoint(action: ImageAction): string {
+  if (action === "video") {
+    return "/videos/generations";
+  }
+  if (action === "img2img" || action === "inpaint") {
+    return "/images/edits";
+  }
+  return "/images/generations";
 }
 
 function normalizeToStringArray(value: unknown): string[] {
@@ -224,19 +234,25 @@ function buildEnvImageApiCall(request: ImageRequest, env: z.output<typeof envSch
 }
 
 function buildOpenAiCompatiblePayload(request: ImageRequest): Record<string, unknown> {
+  const { count, ...params } = request.params ?? {};
   const payload: Record<string, unknown> = {
     model: request.model,
     prompt: request.prompt,
     negative_prompt: request.negativePrompt,
-    ...request.params
+    ...params
   };
 
+  const numericCount = typeof count === "number" ? count : typeof count === "string" && count.trim() ? Number(count) : NaN;
+  if (Number.isFinite(numericCount)) {
+    payload.n = numericCount;
+  }
+
   if (request.inputImage) {
-    payload.image = [request.inputImage];
+    payload.images = [{ image_url: request.inputImage }];
   }
 
   if (request.maskImage) {
-    payload.mask = request.maskImage;
+    payload.mask = { image_url: request.maskImage };
   }
 
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined && value !== ""));
