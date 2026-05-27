@@ -189,7 +189,8 @@ describe("ReferenceCanvas model helpers", () => {
       y: 50,
       data: {
         outputs: [{ assetId: "asset_1", url: "/asset_1.png" }],
-        selectedOutputAssetId: "asset_1"
+        selectedOutputAssetId: "asset_1",
+        sourceNodeId: "g1"
       }
     });
   });

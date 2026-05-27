@@ -1267,6 +1267,7 @@ export function placeOutputAssetsOnCanvas(
     data: {
       outputs: assets,
       selectedOutputAssetId: assets[0]?.assetId,
+      sourceNodeId: sourceNode.id,
       roleTag: "自动承接"
     }
   };

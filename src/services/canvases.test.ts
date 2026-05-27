@@ -76,4 +76,54 @@ describe("canvas storage", () => {
     expect(loaded.viewport).toEqual({ x: -120, y: 45, zoom: 0.75 });
     expect(loaded.selectedNodeId).toBe("g1");
   });
+
+  it("preserves generated output results and their source link when reloading", async () => {
+    await saveCanvas({
+      canvasId: "c_test_canvas",
+      sessionId: "s1",
+      title: "自动输出闭环",
+      nodes: [
+        {
+          id: "g1",
+          type: "api_text2img",
+          x: 40,
+          y: 50,
+          width: 380,
+          height: 360,
+          data: { prompt: "clean product photo", model: "gpt-image-2" },
+          status: "success"
+        },
+        {
+          id: "output_auto",
+          type: "output",
+          x: 480,
+          y: 50,
+          width: 360,
+          height: 250,
+          data: {
+            roleTag: "自动承接",
+            sourceNodeId: "g1",
+            selectedOutputAssetId: "asset_generated",
+            outputs: [{ assetId: "asset_generated", url: "/outputs/20260527/asset_generated.png" }]
+          },
+          status: "success"
+        }
+      ],
+      edges: [{ id: "output_auto_edge", from: "g1", to: "output_auto" }],
+      viewport: { x: -120, y: 45, zoom: 0.75 },
+      selectedNodeId: "output_auto"
+    });
+
+    const loaded = await loadCanvas("c_test_canvas");
+    const output = loaded.nodes.find((node) => node.id === "output_auto");
+
+    expect(loaded.edges).toContainEqual({ id: "output_auto_edge", from: "g1", to: "output_auto" });
+    expect(loaded.selectedNodeId).toBe("output_auto");
+    expect(output?.data).toMatchObject({
+      roleTag: "自动承接",
+      sourceNodeId: "g1",
+      selectedOutputAssetId: "asset_generated",
+      outputs: [{ assetId: "asset_generated", url: "/outputs/20260527/asset_generated.png" }]
+    });
+  });
 });
