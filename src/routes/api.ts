@@ -30,7 +30,7 @@ import { generateImage } from "../imageApi";
 import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger";
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
 import { validateFlowSnapshot } from "../flows/validate";
-import { createCanvas, loadCanvas, saveCanvas } from "../services/canvases";
+import { createCanvas, listCanvases, loadCanvas, saveCanvas } from "../services/canvases";
 import { executeFlowSnapshot } from "../flows/execute";
 import type { FlowSnapshot } from "../flows/types";
 import { createApiFlowRunners } from "../flows/runners/api";
@@ -550,6 +550,16 @@ apiRouter.post("/canvases", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(400).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.get("/canvases", async (_req, res) => {
+  try {
+    const canvases = await listCanvases();
+    res.json({ ok: true, data: canvases });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ ok: false, error: message });
   }
 });
 

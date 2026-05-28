@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
 import {
   Box,
@@ -38,6 +38,7 @@ import {
   executeCanvasFlow,
   fetchProviders,
   fetchSession,
+  listCanvasSnapshots,
   loadCanvasSnapshot,
   saveCanvasSnapshot,
   uploadImage,
@@ -48,7 +49,7 @@ import {
 import { ReferenceCanvas, nodeDefinition, type ReferenceCanvasHandle, type WorkflowGeneScope } from "./canvas/ReferenceCanvas";
 import { compileCanvasSnapshot } from "./canvas/flowCompiler";
 import { imageFilesFromList } from "./canvas/importImages";
-import type { CanvasNodeKind, CanvasNodeStatus } from "./canvas/flowTypes";
+import type { CanvasNodeKind, CanvasNodeStatus, CanvasSnapshot } from "./canvas/flowTypes";
 import {
   addNodeToEditor,
   addNodeToEditorAt,
@@ -195,7 +196,7 @@ export function App() {
   const [isGeneLibraryOpen, setIsGeneLibraryOpen] = useState(false);
   const [geneScope, setGeneScope] = useState<WorkflowGeneScope>("selection");
   const placementIndexRef = useRef(0);
-  const canvasId = useMemo(() => {
+  const [canvasId, setCanvasId] = useState(() => {
     const existing = window.localStorage.getItem("tshuabu:lastCanvasId");
     if (existing) {
       return existing;
@@ -203,8 +204,10 @@ export function App() {
     const next = `c_web_${Date.now().toString(36)}`;
     window.localStorage.setItem("tshuabu:lastCanvasId", next);
     return next;
-  }, []);
+  });
   const [canvasItems, setCanvasItems] = useState<CanvasGateItem[]>(() => readCanvasGateItems(canvasId));
+  const [canvasHydrated, setCanvasHydrated] = useState(false);
+  const autosaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.studioTheme = theme;
@@ -219,6 +222,10 @@ export function App() {
       .then(setProviders)
       .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
   }, []);
+
+  useEffect(() => {
+    setCanvasHydrated(false);
+  }, [canvasId]);
 
   useEffect(() => {
     const handleLinkDragStart = (event: Event) => {
@@ -449,10 +456,25 @@ export function App() {
     window.localStorage.setItem(CANVAS_LIST_KEY, JSON.stringify(items));
   }, []);
 
+  const persistCanvasItem = useCallback((id: string, title: string, updatedAt: string) => {
+    setCanvasItems((current) => {
+      const next = upsertCanvasItem(current, id, title, updatedAt);
+      window.localStorage.setItem(CANVAS_LIST_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    void refreshCanvasGateItems(canvasId)
+      .then((items) => persistCanvasItems(items))
+      .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
+  }, [canvasId, persistCanvasItems]);
+
   const handleOpenCanvas = useCallback((itemId: string) => {
+    setCanvasId(itemId);
     window.localStorage.setItem("tshuabu:lastCanvasId", itemId);
     setIsCanvasOpen(true);
-    setStatus("画布已打开，可以开始创作");
+    setStatus("正在读取画布");
   }, []);
 
   const handleNewCanvas = useCallback(() => {
@@ -463,15 +485,20 @@ export function App() {
       updatedAt: new Date().toISOString()
     };
     window.localStorage.setItem("tshuabu:lastCanvasId", nextId);
+    setCanvasId(nextId);
     persistCanvasItems([nextItem, ...canvasItems].slice(0, 8));
     setIsCanvasOpen(true);
     setStatus("已创建新画布");
   }, [canvasItems, persistCanvasItems]);
 
   const handleRefreshCanvases = useCallback(() => {
-    setCanvasItems(readCanvasGateItems(canvasId));
-    setStatus("画布列表已刷新");
-  }, [canvasId]);
+    void refreshCanvasGateItems(canvasId)
+      .then((items) => {
+        persistCanvasItems(items);
+        setStatus("画布列表已刷新");
+      })
+      .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
+  }, [canvasId, persistCanvasItems]);
 
   const handleClearCanvases = useCallback(() => {
     const resetItems = readCanvasGateItems(canvasId, true);
@@ -754,12 +781,12 @@ export function App() {
       const saved = await saveCanvasSnapshot(snapshot, "当前画布");
       const nextSavedAt = new Date(saved.updatedAt).toLocaleString("zh-CN");
       setSavedAt(nextSavedAt);
-      persistCanvasItems(upsertCanvasItem(canvasItems, canvasId, "当前画布", saved.updatedAt));
+      persistCanvasItem(canvasId, saved.title, saved.updatedAt);
       setStatus(`画布已保存：${saved.canvasId}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
-  }, [canvasId, canvasItems, persistCanvasItems, session?.sessionId]);
+  }, [canvasId, persistCanvasItem, session?.sessionId]);
 
   const handleLoadCanvas = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -772,14 +799,55 @@ export function App() {
       const saved = await loadCanvasSnapshot(canvasId);
       canvas.restoreSnapshot(saved);
       setSavedAt(new Date(saved.updatedAt).toLocaleString("zh-CN"));
+      persistCanvasItem(saved.canvasId, saved.title, saved.updatedAt);
       if (saved.sessionId) {
         setSession(await fetchSession(saved.sessionId));
       }
       setStatus(`画布已读取：${saved.canvasId}`);
+      setCanvasHydrated(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setCanvasHydrated(true);
+      setStatus(error instanceof Error ? `新画布未保存：${error.message}` : String(error));
     }
-  }, [canvasId]);
+  }, [canvasId, persistCanvasItem]);
+
+  useEffect(() => {
+    if (!isCanvasOpen || activePage !== "canvas") {
+      return;
+    }
+    window.setTimeout(() => {
+      void handleLoadCanvas();
+    }, 0);
+  }, [activePage, canvasId, handleLoadCanvas, isCanvasOpen]);
+
+  const handleSnapshotChange = useCallback(
+    (snapshot: CanvasSnapshot) => {
+      if (!canvasHydrated) {
+        return;
+      }
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+      autosaveTimerRef.current = window.setTimeout(() => {
+        autosaveTimerRef.current = null;
+        void saveCanvasSnapshot(snapshot, "当前画布")
+          .then((saved) => {
+            setSavedAt(new Date(saved.updatedAt).toLocaleString("zh-CN"));
+            persistCanvasItem(saved.canvasId, saved.title, saved.updatedAt);
+          })
+          .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
+      }, 900);
+    },
+    [canvasHydrated, persistCanvasItem]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleExportSelected = useCallback(() => {
     const canvas = canvasRef.current;
@@ -867,13 +935,17 @@ export function App() {
                   />
                   <section className="workspace studio-workspace" aria-label="画布">
                     <ReferenceCanvas
+                      key={canvasId}
                       ref={canvasRef}
+                      canvasId={canvasId}
                       defaultProviderId={providers[0]?.id}
                       providers={providers}
+                      sessionId={session?.sessionId}
                       onFiles={handleImportFiles}
                       onNodeFiles={handleImportFilesToNode}
                       onRunNode={(nodeId) => void handleRun(nodeId)}
                       onSelectionChange={setSelectedNode}
+                      onSnapshotChange={handleSnapshotChange}
                       onStatus={setStatus}
                     />
                   </section>
@@ -1647,6 +1719,36 @@ function readCanvasGateItems(canvasId: string, reset = false): CanvasGateItem[] 
   } catch {
     return fallback;
   }
+}
+
+async function refreshCanvasGateItems(canvasId: string): Promise<CanvasGateItem[]> {
+  const localItems = readCanvasGateItems(canvasId);
+  const savedItems = (await listCanvasSnapshots()).map((canvas) => ({
+    id: canvas.canvasId,
+    title: canvas.title || "当前画布",
+    updatedAt: canvas.updatedAt
+  }));
+  return mergeCanvasGateItems(savedItems, localItems, canvasId);
+}
+
+function mergeCanvasGateItems(
+  primary: CanvasGateItem[],
+  fallback: CanvasGateItem[],
+  currentCanvasId: string
+): CanvasGateItem[] {
+  const seen = new Set<string>();
+  const merged: CanvasGateItem[] = [];
+  for (const item of [...primary, ...fallback]) {
+    if (!item.id || seen.has(item.id)) {
+      continue;
+    }
+    seen.add(item.id);
+    merged.push(item);
+  }
+  if (merged.length === 0) {
+    return readCanvasGateItems(currentCanvasId, true);
+  }
+  return merged.slice(0, 12);
 }
 
 function upsertCanvasItem(items: CanvasGateItem[], id: string, title: string, updatedAt: string): CanvasGateItem[] {

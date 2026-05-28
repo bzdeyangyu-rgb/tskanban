@@ -223,6 +223,15 @@ export async function loadCanvasSnapshot(canvasId: string): Promise<StoredCanvas
   return json.data as StoredCanvas;
 }
 
+export async function listCanvasSnapshots(): Promise<StoredCanvas[]> {
+  const response = await fetch("/api/canvases");
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.error || "读取画布列表失败");
+  }
+  return json.data as StoredCanvas[];
+}
+
 export async function fetchSession(sessionId: string): Promise<CanvasSession> {
   const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
   const json = await response.json();

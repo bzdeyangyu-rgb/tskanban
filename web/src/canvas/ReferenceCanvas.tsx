@@ -53,12 +53,15 @@ type ImageEditRequest = {
 };
 
 type ReferenceCanvasProps = {
+  canvasId: string;
   defaultProviderId?: string;
   providers?: ApiProvider[];
+  sessionId?: string;
   onFiles: (files: File[]) => void;
   onNodeFiles: (nodeId: string, files: File[]) => void;
   onRunNode: (nodeId: string) => void;
   onSelectionChange: (selected: { id: string; meta: TshuabuNodeMeta } | null) => void;
+  onSnapshotChange?: (snapshot: CanvasSnapshot) => void;
   onStatus: (message: string) => void;
 };
 
@@ -75,7 +78,7 @@ const MIN_NODE_WIDTH = 220;
 const MIN_NODE_HEIGHT = 126;
 
 export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvasProps>(function ReferenceCanvas(
-  { defaultProviderId, providers = [], onFiles, onNodeFiles, onRunNode, onSelectionChange, onStatus },
+  { canvasId, defaultProviderId, providers = [], sessionId, onFiles, onNodeFiles, onRunNode, onSelectionChange, onSnapshotChange, onStatus },
   ref
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -120,6 +123,18 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       meta: nodeMeta(selectedNode)
     });
   }, [onSelectionChange, selectedNode]);
+
+  useEffect(() => {
+    onSnapshotChange?.({
+      canvasId,
+      sessionId,
+      nodes,
+      edges,
+      viewport,
+      selectedNodeId: selectedIds[0],
+      updatedAt: new Date().toISOString()
+    });
+  }, [canvasId, edges, nodes, onSnapshotChange, selectedIds, sessionId, viewport]);
 
   const screenToCanvas = useCallback(
     (clientX: number, clientY: number) => {

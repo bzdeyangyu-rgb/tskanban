@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import type { FlowSnapshot } from "../flows/types";
 
 const ROOT = process.cwd();
@@ -60,6 +60,26 @@ export async function saveCanvas(canvas: SaveCanvasInput): Promise<StoredCanvas>
 export async function loadCanvas(canvasId: string): Promise<StoredCanvas> {
   const raw = await readFile(canvasPath(canvasId), "utf8");
   return JSON.parse(raw) as StoredCanvas;
+}
+
+export async function listCanvases(): Promise<StoredCanvas[]> {
+  try {
+    const entries = await readdir(CANVAS_DIR, { withFileTypes: true });
+    const canvases = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => {
+          const raw = await readFile(path.join(CANVAS_DIR, entry.name), "utf8");
+          return JSON.parse(raw) as StoredCanvas;
+        })
+    );
+    return canvases.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export function canvasPath(canvasId: string): string {

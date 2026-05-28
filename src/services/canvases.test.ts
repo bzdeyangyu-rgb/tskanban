@@ -1,7 +1,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createCanvas, loadCanvas, saveCanvas } from "./canvases";
+import { createCanvas, listCanvases, loadCanvas, saveCanvas } from "./canvases";
 
 const canvasDir = path.join(process.cwd(), "logs", "canvases");
 
@@ -12,6 +12,7 @@ describe("canvas storage", () => {
 
   afterEach(async () => {
     await rm(path.join(canvasDir, "c_test_canvas.json"), { force: true });
+    await rm(path.join(canvasDir, "c_test_canvas_old.json"), { force: true });
   });
 
   it("creates a new empty canvas snapshot", async () => {
@@ -125,5 +126,31 @@ describe("canvas storage", () => {
       selectedOutputAssetId: "asset_generated",
       outputs: [{ assetId: "asset_generated", url: "/outputs/20260527/asset_generated.png" }]
     });
+  });
+
+  it("lists saved canvases newest first for the canvas gate", async () => {
+    await saveCanvas({
+      canvasId: "c_test_canvas_old",
+      title: "旧画布",
+      nodes: [{ id: "p1", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: { text: "old" } }],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      createdAt: "2026-05-19T00:00:00.000Z",
+      updatedAt: "2026-05-19T00:00:00.000Z"
+    });
+    await saveCanvas({
+      canvasId: "c_test_canvas",
+      title: "新画布",
+      nodes: [{ id: "p2", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: { text: "new" } }],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 }
+    });
+
+    const canvases = await listCanvases();
+
+    expect(canvases.map((canvas) => canvas.canvasId)).toEqual(expect.arrayContaining(["c_test_canvas", "c_test_canvas_old"]));
+    expect(canvases.findIndex((canvas) => canvas.canvasId === "c_test_canvas")).toBeLessThan(
+      canvases.findIndex((canvas) => canvas.canvasId === "c_test_canvas_old")
+    );
   });
 });
