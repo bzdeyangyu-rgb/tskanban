@@ -103,6 +103,15 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
           <span>当前版本</span>
           <strong>{session.currentVersionId ?? "-"}</strong>
         </div>
+        <HistorySummary stats={model.stats} />
+        <OutputAssetList
+          assets={model.outputAssets}
+          selectedAssetId={selectedAssetId}
+          onSelect={(assetId) => {
+            setSelectedAssetId(assetId);
+            setTab("source");
+          }}
+        />
         <div className="history-tabs" role="tablist" aria-label="运行历史视图">
           {(["runs", "versions", "source", "rag"] as HistoryTab[]).map((item) => (
             <button
@@ -140,6 +149,68 @@ export function RunHistory({ session }: { session: CanvasSession | null }) {
   );
 }
 
+function HistorySummary({ stats }: { stats: ReturnType<typeof buildRunHistoryModel>["stats"] }) {
+  return (
+    <div className="history-summary" aria-label="运行摘要">
+      <div>
+        <span>运行</span>
+        <strong>{stats.runCount}</strong>
+      </div>
+      <div>
+        <span>成功</span>
+        <strong>{stats.successCount}</strong>
+      </div>
+      <div>
+        <span>失败</span>
+        <strong>{stats.failedCount}</strong>
+      </div>
+      <div>
+        <span>输出</span>
+        <strong>{stats.outputCount}</strong>
+      </div>
+      <div>
+        <span>耗时</span>
+        <strong>{stats.totalLatencyMs}ms</strong>
+      </div>
+      <div>
+        <span>节点</span>
+        <strong>{stats.nodeCount}</strong>
+      </div>
+    </div>
+  );
+}
+
+function OutputAssetList({
+  assets,
+  selectedAssetId,
+  onSelect
+}: {
+  assets: ReturnType<typeof buildRunHistoryModel>["outputAssets"];
+  selectedAssetId: string;
+  onSelect: (assetId: string) => void;
+}) {
+  if (assets.length === 0) {
+    return <p className="muted compact">暂无输出结果</p>;
+  }
+
+  return (
+    <div className="history-output-assets" aria-label="输出结果">
+      {assets.map((asset) => (
+        <button
+          className={selectedAssetId === asset.assetId ? "active" : ""}
+          key={asset.assetId}
+          onClick={() => onSelect(asset.assetId)}
+          type="button"
+        >
+          <strong>{asset.assetId}</strong>
+          <span>{asset.action ?? "输出"} / {asset.versionId ?? "-"}</span>
+          <small>{asset.sourceNodeId ?? "-"} / {asset.status ?? "-"}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function RunList({
   runs,
   selectedRun,
@@ -171,8 +242,9 @@ function RunList({
         <article className={`history-run ${selectedRun.status}`}>
           <div className="history-run-head">
             <strong>{selectedRun.runId}</strong>
-            <span>{selectedRun.nodes.length} 节点</span>
+            <span>{selectedRun.nodes.length} 节点 / 输出 {selectedRun.outputAssetIds.length}</span>
           </div>
+          {selectedRun.errorMessage ? <p className="history-error">{selectedRun.errorMessage}</p> : null}
           <div className="history-node-list">
             {selectedRun.nodes.map((node) => (
               <div className={`history-node ${node.status}`} key={`${selectedRun.runId}-${node.nodeId}`}>
@@ -181,6 +253,7 @@ function RunList({
                   <span>{node.nodeType}</span>
                 </div>
                 <small>{node.versionId ?? node.status}</small>
+                {node.errorMessage ? <p className="history-error">{node.errorMessage}</p> : null}
                 {node.prompt ? <p>{node.prompt}</p> : null}
                 <small>
                   输入 {node.inputAssetIds.length} / 输出 {node.outputAssetIds.length}
