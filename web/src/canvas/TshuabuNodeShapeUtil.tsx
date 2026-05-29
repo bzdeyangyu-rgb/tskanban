@@ -1,6 +1,7 @@
 import { BaseBoxShapeUtil, HTMLContainer, type TLBaseShape } from "tldraw";
 import type { DragEvent, PointerEvent } from "react";
 import type { CanvasNodeKind, CanvasNodeStatus } from "./flowTypes";
+import { imageFilesFromList } from "./importImages";
 import type { TshuabuNodeMeta } from "./shapeUtils";
 
 export type TshuabuNodeShape = TLBaseShape<"tshuabu-node", { w: number; h: number }>;
@@ -106,7 +107,7 @@ function NodeBody({
         {url ? <img alt={stringValue(data.name) || "素材"} className="node-thumb" src={url} /> : <div className="node-empty">点击或拖入图片</div>}
         <input
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
           aria-label="导入图片"
           onClick={(event) => event.stopPropagation()}
           onPointerDown={stopNodeControl}
@@ -221,7 +222,7 @@ function handleImageDrop(event: DragEvent<HTMLElement>, nodeId: string) {
 }
 
 function dispatchNodeFiles(nodeId: string, files: FileList | null) {
-  const imageFiles = files ? Array.from(files).filter((file) => file.type.startsWith("image/")) : [];
+  const imageFiles = files ? imageFilesFromList(Array.from(files)) : [];
   if (imageFiles.length === 0) {
     return;
   }

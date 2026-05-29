@@ -159,15 +159,26 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   const addNode = useCallback(
     (definition: NodeDefinition, options?: { x?: number; y?: number; connectFrom?: string }) => {
       const id = `node_${Date.now().toString(36)}_${nodeCounterRef.current++}`;
+      const nodeSize = { width: definition.width ?? 280, height: definition.height ?? 170 };
+      const hostRect = hostRef.current?.getBoundingClientRect();
+      const imagePosition =
+        definition.type === "image" && typeof options?.x !== "number" && typeof options?.y !== "number"
+          ? imageImportPosition(
+              viewport,
+              { width: hostRect?.width ?? 1200, height: hostRect?.height ?? 800 },
+              nodeSize,
+              (nodeCounterRef.current % 4) * 32
+            )
+          : undefined;
       const fallbackX = 80 + (nodeCounterRef.current % 3) * 320;
       const fallbackY = 90 + Math.floor(nodeCounterRef.current / 3) * 220;
       const node: CanvasNode = {
         id,
         type: definition.type,
-        x: options?.x ?? fallbackX,
-        y: options?.y ?? fallbackY,
-        width: definition.width ?? 280,
-        height: definition.height ?? 170,
+        x: options?.x ?? imagePosition?.x ?? fallbackX,
+        y: options?.y ?? imagePosition?.y ?? fallbackY,
+        width: nodeSize.width,
+        height: nodeSize.height,
         data: definition.data ?? {},
         status: "idle"
       };
@@ -185,7 +196,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       setSelectedIds([id]);
       return id;
     },
-    []
+    [viewport]
   );
 
   const patchNode = useCallback((nodeId: string, patch: Partial<CanvasNode>) => {
@@ -770,7 +781,7 @@ function renderNodeBody(
           <span>{url ? "替换图片" : "导入图片"}</span>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
             aria-label="导入图片"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
@@ -1163,6 +1174,18 @@ export function imageEditNodeDefinition(sourceNode: CanvasNode, providerId?: str
     },
     width: 380,
     height: 360
+  };
+}
+
+export function imageImportPosition(
+  viewport: { x: number; y: number; zoom: number },
+  viewportSize: { width: number; height: number },
+  nodeSize: { width: number; height: number },
+  offset = 0
+): { x: number; y: number } {
+  return {
+    x: (viewportSize.width / 2 - viewport.x) / viewport.zoom - nodeSize.width / 2 + offset,
+    y: (viewportSize.height / 2 - viewport.y) / viewport.zoom - nodeSize.height / 2 + offset
   };
 }
 

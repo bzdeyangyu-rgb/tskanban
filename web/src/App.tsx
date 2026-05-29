@@ -320,8 +320,13 @@ export function App() {
         return;
       }
       try {
-        setStatus(`姝ｅ湪瀵煎叆 ${file.name}`);
-        const uploaded = await uploadImage(file, session?.sessionId);
+        const [imageFile] = imageFilesFromList([file]);
+        if (!imageFile) {
+          setStatus("没有可导入的 jpg/png/webp 图片");
+          return;
+        }
+        setStatus(`正在导入 ${imageFile.name}`);
+        const uploaded = await uploadImage(imageFile, session?.sessionId);
         setSession(await fetchSession(uploaded.sessionId));
         editor.updateShape({
           id: shape.id,
@@ -329,12 +334,12 @@ export function App() {
           meta: mergeNodeData(shape.meta, {
             assetId: uploaded.asset.assetId,
             url: uploaded.asset.publicUrl,
-            name: file.name,
+            name: imageFile.name,
             mime: uploaded.asset.mime,
             roleTag: "\u672c\u5730\u5bfc\u5165"
           })
         });
-        setStatus(`\u5df2\u5bfc\u5165\u5230\u56fe\u7247\u8282\u70b9\uff1a${file.name}`);
+        setStatus(`已导入到图片节点：${imageFile.name}`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -661,6 +666,39 @@ export function App() {
     [selectedNode]
   );
 
+  const uploadFileAsImageNode = useCallback(
+    async (file: File, options?: { nodeId?: string; sessionId?: string }) => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error("画布还在加载");
+      }
+
+      const uploaded = await uploadImage(file, options?.sessionId ?? session?.sessionId);
+      const imageData = {
+        assetId: uploaded.asset.assetId,
+        url: uploaded.asset.publicUrl,
+        name: file.name,
+        mime: uploaded.asset.mime,
+        roleTag: "素材"
+      };
+
+      if (options?.nodeId) {
+        canvas.importImageNode(options.nodeId, imageData);
+      } else {
+        canvas.addNode({
+          type: "image",
+          title: "图片节点",
+          data: imageData,
+          width: 280,
+          height: 260
+        });
+      }
+
+      return uploaded.sessionId;
+    },
+    [session?.sessionId]
+  );
+
   const handleImportFiles = useCallback(
     async (files: File[]) => {
       const canvas = canvasRef.current;
@@ -679,21 +717,7 @@ export function App() {
         setStatus(`正在导入 ${imageFiles.length} 张图片`);
         let currentSessionId = session?.sessionId;
         for (const file of imageFiles) {
-          const uploaded = await uploadImage(file, currentSessionId);
-          currentSessionId = uploaded.sessionId;
-          canvas.addNode({
-            type: "image",
-            title: "图片节点",
-            data: {
-              assetId: uploaded.asset.assetId,
-              url: uploaded.asset.publicUrl,
-              name: file.name,
-              mime: uploaded.asset.mime,
-              roleTag: "素材"
-            },
-            width: 280,
-            height: 260
-          });
+          currentSessionId = await uploadFileAsImageNode(file, { sessionId: currentSessionId });
           placementIndexRef.current += 1;
         }
 
@@ -705,7 +729,7 @@ export function App() {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     },
-    [session?.sessionId]
+    [session?.sessionId, uploadFileAsImageNode]
   );
 
   const handleImportFilesToNode = useCallback(
@@ -721,21 +745,14 @@ export function App() {
       }
       try {
         setStatus(`正在导入 ${file.name}`);
-        const uploaded = await uploadImage(file, session?.sessionId);
-        setSession(await fetchSession(uploaded.sessionId));
-        canvas.importImageNode(nodeId, {
-          assetId: uploaded.asset.assetId,
-          url: uploaded.asset.publicUrl,
-          name: file.name,
-          mime: uploaded.asset.mime,
-          roleTag: "素材"
-        });
+        const nextSessionId = await uploadFileAsImageNode(file, { nodeId });
+        setSession(await fetchSession(nextSessionId));
         setStatus(`已导入到图片节点：${file.name}`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       }
     },
-    [session?.sessionId]
+    [uploadFileAsImageNode]
   );
   const handleRun = useCallback(async (targetNodeId?: string) => {
     const canvas = canvasRef.current;

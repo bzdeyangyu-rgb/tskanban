@@ -7,6 +7,7 @@ import {
   edgeActionPosition,
   enabledGeneratorProviders,
   imageEditNodeDefinition,
+  imageImportPosition,
   importWorkflowGeneToCanvas,
   moveCanvasNodes,
   promptGeneSourceFromNodes,
@@ -174,6 +175,17 @@ describe("ReferenceCanvas model helpers", () => {
         prompt: ""
       }
     });
+  });
+
+  it("places imported image nodes around the viewport center", () => {
+    const position = imageImportPosition(
+      { x: 80, y: 80, zoom: 0.92 },
+      { width: 1200, height: 800 },
+      { width: 280, height: 260 }
+    );
+
+    expect(position.x).toBeCloseTo(425.217);
+    expect(position.y).toBeCloseTo(217.826);
   });
 
   it("merges output assets without duplicating existing results", () => {
