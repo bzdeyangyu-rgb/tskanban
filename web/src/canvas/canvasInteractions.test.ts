@@ -3,7 +3,9 @@ import type { CanvasNode } from "./flowTypes";
 import {
   canvasPanViewport,
   canvasShortcutAllowed,
+  cloneSelectedSubgraph,
   linkReleaseAction,
+  nodePositionFromViewport,
   nodeIdsInSelection,
   resizeNodeFromBottomRight
 } from "./canvasInteractions";
@@ -29,6 +31,37 @@ describe("canvas interactions", () => {
       y: 6,
       zoom: 0.75
     });
+  });
+
+  it("places new nodes at the viewport center", () => {
+    expect(nodePositionFromViewport({ x: -400, y: -300, zoom: 1 }, { width: 1200, height: 800 }, { width: 260, height: 180 })).toEqual({
+      x: 870,
+      y: 610
+    });
+  });
+
+  it("copies selected nodes with internal edges and offsets pasted nodes", () => {
+    const result = cloneSelectedSubgraph(
+      {
+        nodes: [
+          { id: "p1", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} },
+          { id: "g1", type: "api_text2img", x: 160, y: 0, width: 100, height: 100, data: {} },
+          { id: "out", type: "output", x: 320, y: 0, width: 100, height: 100, data: {} }
+        ],
+        edges: [
+          { id: "e1", from: "p1", to: "g1" },
+          { id: "e2", from: "g1", to: "out" }
+        ]
+      },
+      ["p1", "g1"],
+      { x: 40, y: 40 },
+      { nodePrefix: "copy", edgePrefix: "copyEdge" }
+    );
+
+    expect(result.nodes).toHaveLength(2);
+    expect(result.edges).toEqual([{ id: "copyEdge_e1", from: "copy_p1", to: "copy_g1" }]);
+    expect(result.nodes[0]).toMatchObject({ id: "copy_p1", x: 40, y: 40 });
+    expect(result.nodes[1]).toMatchObject({ id: "copy_g1", x: 200, y: 40 });
   });
 
   it("selects every node touched by a ctrl drag rectangle in canvas coordinates", () => {

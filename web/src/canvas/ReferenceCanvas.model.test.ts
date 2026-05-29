@@ -13,9 +13,7 @@ import {
   promptGeneSourceFromNodes,
   generatorModelOptions,
   generatorNodeInputSummary,
-  mergeGeneratorParam,
   mergeOutputAssets,
-  nextRandomSeed,
   linkOptions,
   outputNodeForAssets,
   placeOutputAssetsOnCanvas,
@@ -63,12 +61,6 @@ describe("ReferenceCanvas model helpers", () => {
 
     expect(generatorModelOptions(providers, "apimart", "api_img2img")).toEqual(["seedream", "flux"]);
     expect(generatorModelOptions(providers, "", "api_img2img")).toEqual(["primary-image"]);
-  });
-
-  it("updates seed params without leaving an empty seed behind", () => {
-    expect(mergeGeneratorParam({ seed: "42", steps: 18 }, "seed", "")).toEqual({ steps: 18 });
-    expect(mergeGeneratorParam({}, "seed", "123")).toEqual({ seed: "123" });
-    expect(nextRandomSeed(() => 0.123456789)).toBe("123456789");
   });
 
   it("drags group children with the group frame", () => {

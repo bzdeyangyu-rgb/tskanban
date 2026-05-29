@@ -22,6 +22,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent
 } from "react";
@@ -29,7 +30,9 @@ import type { ApiProvider } from "../api/client";
 import {
   canvasPanViewport,
   canvasShortcutAllowed,
+  cloneSelectedSubgraph,
   linkReleaseAction,
+  nodePositionFromViewport,
   nodeIdsInSelection,
   resizeNodeFromBottomRight
 } from "./canvasInteractions";
@@ -74,6 +77,7 @@ type ReferenceCanvasProps = {
 
 type Viewport = { x: number; y: number; zoom: number };
 type CreateMenu = { fromId: string; x: number; y: number; canvasX: number; canvasY: number; fromType: CanvasNodeKind };
+type CanvasContextMenuState = { x: number; y: number; canvasX: number; canvasY: number };
 type DragLink = { fromId: string; fromType: CanvasNodeKind; x1: number; y1: number; x2: number; y2: number };
 type DragState =
   | { type: "node"; id: string; startX: number; startY: number; ids: string[]; nodes: CanvasNode[] }
@@ -100,6 +104,8 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null);
+  const [canvasMenu, setCanvasMenu] = useState<CanvasContextMenuState | null>(null);
+  const [clipboard, setClipboard] = useState<{ nodes: CanvasNode[]; edges: CanvasEdge[] } | null>(null);
 
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedIds[0]), [nodes, selectedIds]);
   const edgeActions = useMemo(
@@ -161,22 +167,20 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       const id = `node_${Date.now().toString(36)}_${nodeCounterRef.current++}`;
       const nodeSize = { width: definition.width ?? 280, height: definition.height ?? 170 };
       const hostRect = hostRef.current?.getBoundingClientRect();
-      const imagePosition =
-        definition.type === "image" && typeof options?.x !== "number" && typeof options?.y !== "number"
-          ? imageImportPosition(
-              viewport,
-              { width: hostRect?.width ?? 1200, height: hostRect?.height ?? 800 },
-              nodeSize,
-              (nodeCounterRef.current % 4) * 32
-            )
-          : undefined;
-      const fallbackX = 80 + (nodeCounterRef.current % 3) * 320;
-      const fallbackY = 90 + Math.floor(nodeCounterRef.current / 3) * 220;
+      const viewportPosition = nodePositionFromViewport(
+        viewport,
+        { width: hostRect?.width ?? 1200, height: hostRect?.height ?? 800 },
+        nodeSize
+      );
+      const defaultPosition = {
+        x: viewportPosition.x + (nodeCounterRef.current % 4) * 32,
+        y: viewportPosition.y + (nodeCounterRef.current % 4) * 32
+      };
       const node: CanvasNode = {
         id,
         type: definition.type,
-        x: options?.x ?? imagePosition?.x ?? fallbackX,
-        y: options?.y ?? imagePosition?.y ?? fallbackY,
+        x: options?.x ?? defaultPosition.x,
+        y: options?.y ?? defaultPosition.y,
         width: nodeSize.width,
         height: nodeSize.height,
         data: definition.data ?? {},
@@ -234,6 +238,26 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     onStatus(selectedEdgeId ? "\u5df2\u5220\u9664 1 \u6761\u8fde\u7ebf" : `\u5df2\u5220\u9664 ${deletedNodeCount} \u4e2a\u8282\u70b9`);
   }, [edges, onStatus, selectedEdgeId, selectedIds]);
 
+  const pasteClipboard = useCallback(() => {
+    if (!clipboard || clipboard.nodes.length === 0) {
+      return;
+    }
+    const stamp = `${Date.now().toString(36)}_${nodeCounterRef.current++}`;
+    const pasted = cloneSelectedSubgraph(
+      clipboard,
+      clipboard.nodes.map((node) => node.id),
+      { x: 40, y: 40 },
+      { nodePrefix: `node_${stamp}`, edgePrefix: `edge_${stamp}` }
+    );
+    setNodes((current) => [...current, ...pasted.nodes]);
+    setEdges((current) => [...current, ...pasted.edges]);
+    setSelectedIds(pasted.nodes.map((node) => node.id));
+    setSelectedEdgeId(null);
+    setCreateMenu(null);
+    setCanvasMenu(null);
+    onStatus(`已粘贴 ${pasted.nodes.length} 个节点`);
+  }, [clipboard, onStatus]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -241,6 +265,28 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         return;
       }
       if (event.key !== "Delete" && event.key !== "Backspace") {
+        const isCopy = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c";
+        const isPaste = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v";
+        if (isCopy) {
+          if (selectedIds.length === 0) {
+            return;
+          }
+          event.preventDefault();
+          const selected = new Set(selectedIds);
+          setClipboard({
+            nodes: nodes.filter((node) => selected.has(node.id)).map((node) => ({ ...node, data: { ...node.data } })),
+            edges: edges.filter((edge) => selected.has(edge.from) && selected.has(edge.to)).map((edge) => ({ ...edge }))
+          });
+          onStatus(`已复制 ${selectedIds.length} 个节点`);
+          return;
+        }
+        if (isPaste) {
+          if (!clipboard || clipboard.nodes.length === 0) {
+            return;
+          }
+          event.preventDefault();
+          pasteClipboard();
+        }
         return;
       }
       event.preventDefault();
@@ -248,7 +294,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteSelected]);
+  }, [clipboard, deleteSelected, edges, nodes, onStatus, pasteClipboard, selectedIds]);
 
   useEffect(() => {
     if (!dragState && !dragLink) {
@@ -449,10 +495,11 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
 
   const handleHostPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest("[data-reference-node-id], .reference-create-menu, button, input, textarea, select")) {
+    if (target?.closest("[data-reference-node-id], .reference-create-menu, .reference-canvas-menu, button, input, textarea, select")) {
       return;
     }
     setCreateMenu(null);
+    setCanvasMenu(null);
     setSelectedEdgeId(null);
     if (event.ctrlKey || event.metaKey) {
       setDragState({
@@ -466,6 +513,21 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
     }
     setSelectedIds([]);
     setDragState({ type: "pan", startX: event.clientX, startY: event.clientY, x: viewport.x, y: viewport.y });
+  };
+
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".reference-create-menu, .reference-canvas-menu, button, input, textarea, select")) {
+      return;
+    }
+    event.preventDefault();
+    if (target?.closest("[data-reference-node-id]")) {
+      return;
+    }
+    const point = screenToCanvas(event.clientX, event.clientY);
+    setCreateMenu(null);
+    setSelectedEdgeId(null);
+    setCanvasMenu({ x: event.clientX, y: event.clientY, canvasX: point.x, canvasY: point.y });
   };
 
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
@@ -482,6 +544,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       ref={hostRef}
       className="reference-canvas"
       onPointerDown={handleHostPointerDown}
+      onContextMenu={handleContextMenu}
       onWheel={handleWheel}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
@@ -658,6 +721,48 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
               connectFrom: createMenu.fromId
             });
             setCreateMenu(null);
+          }}
+        />
+      ) : null}
+      {canvasMenu ? (
+        <ReferenceCanvasContextMenu
+          menu={canvasMenu}
+          canPaste={Boolean(clipboard?.nodes.length)}
+          canDelete={selectedIds.length > 0 || Boolean(selectedEdgeId)}
+          canGroup={selectedIds.length >= 2}
+          onClose={() => setCanvasMenu(null)}
+          onCreate={(type) => {
+            const definition = nodeDefinition(type, defaultProviderId);
+            addNode(definition, {
+              x: canvasMenu.canvasX - (definition.width ?? 280) / 2,
+              y: canvasMenu.canvasY - (definition.height ?? 170) / 2
+            });
+            setCanvasMenu(null);
+            onStatus(`已添加 ${definition.title}`);
+          }}
+          onPaste={pasteClipboard}
+          onDelete={deleteSelected}
+          onGroup={() => {
+            const grouped = selectedIds.length >= 2;
+            if (grouped) {
+              const picked = nodes.filter((node) => selectedIds.includes(node.id));
+              const left = Math.min(...picked.map((node) => node.x)) - 22;
+              const top = Math.min(...picked.map((node) => node.y)) - 28;
+              const right = Math.max(...picked.map((node) => node.x + node.width)) + 22;
+              const bottom = Math.max(...picked.map((node) => node.y + node.height)) + 22;
+              addNode(
+                {
+                  type: "group" as CanvasNodeKind,
+                  title: "分组",
+                  data: { childIds: selectedIds },
+                  width: right - left,
+                  height: bottom - top
+                },
+                { x: left, y: top }
+              );
+              setCanvasMenu(null);
+              onStatus("已创建分组");
+            }
           }}
         />
       ) : null}
@@ -914,15 +1019,10 @@ function ReferenceGeneratorBody({
   const modelOptions = model && !baseModelOptions.includes(model) ? [model, ...baseModelOptions] : baseModelOptions;
   const resolution = stringValue(node.data.resolution) || "1k";
   const ratio = stringValue(node.data.ratio) || "square";
-  const count = clamp(Number(node.data.count) || 1, 1, 8);
   const customWidth = stringValue(node.data.customWidth);
   const customHeight = stringValue(node.data.customHeight);
-  const params = recordValue(node.data.params);
-  const seed = stringValue(params.seed);
   const showCustomSize = resolution === "custom" || ratio === "custom";
 
-  const setCount = (next: number) => onData(node.id, { count: clamp(next, 1, 8) });
-  const setParam = (key: string, value: string | number) => onData(node.id, { params: mergeGeneratorParam(params, key, value) });
   const setProvider = (nextProviderId: string) => {
     const [nextModel] = generatorModelOptions(providers, nextProviderId, node.type);
     onData(node.id, { providerId: nextProviderId, model: nextModel || model });
@@ -937,7 +1037,7 @@ function ReferenceGeneratorBody({
             <p>{prompt}</p>
           </>
         ) : (
-          <span>连接提示词，或在下方覆盖提示词</span>
+          <span>连接提示词节点后生成</span>
         )}
       </div>
       <div className="reference-generator-label">Images</div>
@@ -950,7 +1050,7 @@ function ReferenceGeneratorBody({
             </figure>
           ))
         ) : (
-          <span>连接图片、Output 或分组后显示输入素材</span>
+          <span>{node.type === "api_text2img" ? "文生图不需要图片输入" : "连接图片或 Output 作为输入素材"}</span>
         )}
       </div>
       <div className="reference-gen-settings">
@@ -988,33 +1088,6 @@ function ReferenceGeneratorBody({
             <option value="wide">16:9</option>
             <option value="custom">自定义</option>
           </select>
-          <div className="reference-gen-stepper">
-            <button type="button" onClick={() => setCount(count - 1)} aria-label="减少数量">
-              ‹
-            </button>
-            <input value={count} inputMode="numeric" onChange={(event) => setCount(Number(event.target.value) || 1)} />
-            <button type="button" onClick={() => setCount(count + 1)} aria-label="增加数量">
-              ›
-            </button>
-          </div>
-        </div>
-        <div className="reference-gen-row">
-          <label>
-            <span>Seed</span>
-            <div className="reference-seed-control">
-              <input value={seed} placeholder="随机" onChange={(event) => setParam("seed", event.target.value)} />
-              <button type="button" onClick={() => setParam("seed", nextRandomSeed())}>
-                随机
-              </button>
-              <button type="button" onClick={() => setParam("seed", "")}>
-                清空
-              </button>
-            </div>
-          </label>
-          <label>
-            <span>重复</span>
-            <input value={count} inputMode="numeric" onChange={(event) => setCount(Number(event.target.value) || 1)} />
-          </label>
         </div>
         {showCustomSize ? (
           <div className="reference-gen-row">
@@ -1083,6 +1156,73 @@ function CreateNodeMenu({
   );
 }
 
+function ReferenceCanvasContextMenu({
+  canDelete,
+  canGroup,
+  canPaste,
+  menu,
+  onClose,
+  onCreate,
+  onDelete,
+  onGroup,
+  onPaste
+}: {
+  canDelete: boolean;
+  canGroup: boolean;
+  canPaste: boolean;
+  menu: CanvasContextMenuState;
+  onClose: () => void;
+  onCreate: (type: CanvasNodeKind) => void;
+  onDelete: () => void;
+  onGroup: () => void;
+  onPaste: () => void;
+}) {
+  const createActions: Array<{ type: CanvasNodeKind; label: string; icon: LucideIcon }> = [
+    { type: "image", label: "新建图片", icon: ImagePlus },
+    { type: "prompt", label: "新建提示词", icon: FileText },
+    { type: "api_text2img", label: "新建 API", icon: CloudLightning }
+  ];
+
+  return (
+    <div className="reference-canvas-menu" style={{ left: menu.x, top: menu.y }} role="menu" onPointerDown={(event) => event.stopPropagation()}>
+      {createActions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <button key={action.type} type="button" role="menuitem" onClick={() => onCreate(action.type)}>
+            <Icon aria-hidden="true" size={15} />
+            <span>{action.label}</span>
+          </button>
+        );
+      })}
+      <div className="reference-canvas-menu-divider" />
+      <button type="button" role="menuitem" disabled={!canPaste} onClick={onPaste}>
+        <Layers aria-hidden="true" size={15} />
+        <span>粘贴</span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        disabled={!canDelete}
+        onClick={() => {
+          onDelete();
+          onClose();
+        }}
+      >
+        <X aria-hidden="true" size={15} />
+        <span>删除选中</span>
+      </button>
+      <button type="button" role="menuitem" disabled={!canGroup} onClick={onGroup}>
+        <Group aria-hidden="true" size={15} />
+        <span>创建分组</span>
+      </button>
+      <button type="button" className="reference-canvas-menu-close" role="menuitem" onClick={onClose}>
+        <X aria-hidden="true" size={15} />
+        <span>关闭</span>
+      </button>
+    </div>
+  );
+}
+
 function LinkPreview({ link }: { link: DragLink }) {
   const left = Math.min(link.x1, link.x2);
   const top = Math.min(link.y1, link.y2);
@@ -1140,9 +1280,9 @@ export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeD
     case "loop":
       return { type, title: "循环", data: { count: 4, prompt: "" }, width: 300, height: 200 };
     case "api_img2img":
-      return { type, title: "图生图", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
+      return { type, title: "图生图", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square" }, width: 380, height: 320 };
     case "api_inpaint":
-      return { type, title: "局部重绘", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
+      return { type, title: "局部重绘", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square" }, width: 380, height: 320 };
     case "video":
       return { type, title: "视频生成", data: { ...providerData, model: "" }, width: 330, height: 220 };
     case "comfy":
@@ -1151,7 +1291,7 @@ export function nodeDefinition(type: CanvasNodeKind, providerId?: string): NodeD
       return { type, title: "Output", data: {}, width: 360, height: 250 };
     case "api_text2img":
     default:
-      return { type: "api_text2img", title: "API生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square", count: 1 }, width: 380, height: 360 };
+      return { type: "api_text2img", title: "API生成", data: { ...providerData, model: "gpt-image-2", resolution: "1k", ratio: "square" }, width: 380, height: 320 };
   }
 }
 
@@ -1183,9 +1323,10 @@ export function imageImportPosition(
   nodeSize: { width: number; height: number },
   offset = 0
 ): { x: number; y: number } {
+  const position = nodePositionFromViewport(viewport, viewportSize, nodeSize);
   return {
-    x: (viewportSize.width / 2 - viewport.x) / viewport.zoom - nodeSize.width / 2 + offset,
-    y: (viewportSize.height / 2 - viewport.y) / viewport.zoom - nodeSize.height / 2 + offset
+    x: position.x + offset,
+    y: position.y + offset
   };
 }
 
@@ -1324,24 +1465,6 @@ export function generatorModelOptions(providers: readonly ApiProvider[], provide
   const models = type === "video" ? selected?.videoModels : selected?.imageModels;
   const filtered = (models ?? []).map((model) => model.trim()).filter(Boolean);
   return filtered.length ? Array.from(new Set(filtered)) : ["gpt-image-2"];
-}
-
-export function mergeGeneratorParam(
-  params: Record<string, unknown>,
-  key: string,
-  value: string | number
-): Record<string, unknown> {
-  const next = { ...params };
-  if (typeof value === "string" && value.trim() === "") {
-    delete next[key];
-    return next;
-  }
-  next[key] = value;
-  return next;
-}
-
-export function nextRandomSeed(random: () => number = Math.random): string {
-  return String(Math.floor(random() * 1_000_000_000));
 }
 
 export function mergeOutputAssets(

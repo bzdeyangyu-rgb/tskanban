@@ -76,4 +76,70 @@ describe("compileShapesToSnapshot", () => {
 
     expect(snapshot.edges).toEqual([]);
   });
+
+  it("normalizes connected image and prompt inputs onto img2img generator data", () => {
+    const snapshot = compileShapesToSnapshot({
+      canvasId: "c1",
+      shapes: [
+        {
+          id: "shape:img",
+          type: "geo",
+          x: 0,
+          y: 0,
+          meta: {
+            kind: "tshuabu-node",
+            nodeType: "image",
+            title: "图片",
+            data: { assetId: "asset_base", url: "/outputs/base.png", name: "base.png" }
+          },
+          props: { w: 260, h: 180 }
+        },
+        {
+          id: "shape:p1",
+          type: "geo",
+          x: 0,
+          y: 220,
+          meta: { kind: "tshuabu-node", nodeType: "prompt", title: "提示词", data: { text: "保留构图，增强光影" } },
+          props: { w: 260, h: 180 }
+        },
+        {
+          id: "shape:g1",
+          type: "geo",
+          x: 340,
+          y: 0,
+          meta: {
+            kind: "tshuabu-node",
+            nodeType: "api_img2img",
+            title: "图生图",
+            data: { model: "gpt-image-2", prompt: "旧提示词" }
+          },
+          props: { w: 300, h: 200 }
+        },
+        {
+          id: "shape:o1",
+          type: "geo",
+          x: 700,
+          y: 0,
+          meta: { kind: "tshuabu-node", nodeType: "output", title: "Output", data: {} },
+          props: { w: 260, h: 180 }
+        },
+        { id: "shape:e1", type: "arrow", x: 0, y: 0, meta: {}, props: {} },
+        { id: "shape:e2", type: "arrow", x: 0, y: 0, meta: {}, props: {} },
+        { id: "shape:e3", type: "arrow", x: 0, y: 0, meta: {}, props: {} }
+      ],
+      arrowEndpoints: {
+        "shape:e1": { start: "shape:img", end: "shape:g1" },
+        "shape:e2": { start: "shape:p1", end: "shape:g1" },
+        "shape:e3": { start: "shape:g1", end: "shape:o1" }
+      },
+      viewport: { x: 0, y: 0, zoom: 1 }
+    });
+
+    const generator = snapshot.nodes.find((node) => node.id === "shape:g1");
+    expect(generator?.data).toMatchObject({
+      baseAssetId: "asset_base",
+      prompt: "保留构图，增强光影",
+      inputAssetIds: ["asset_base"]
+    });
+  });
 });

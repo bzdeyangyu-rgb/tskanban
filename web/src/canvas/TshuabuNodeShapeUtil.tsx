@@ -173,15 +173,13 @@ function NodeBody({
   return (
     <div className="tshuabu-node-body node-editor-body api-node-form" onPointerDown={stopNodeControl}>
       <NodeInput nodeId={nodeId} data={data} field="model" label={nodeType === "video" ? "视频模型" : "模型"} placeholder="选择模型" />
-      <textarea
-        value={stringValue(data.prompt)}
-        placeholder={status === "failed" ? stringValue(data.errorMessage) || "执行失败" : "Prompt 覆盖，可连接提示词节点"}
-        onChange={(event) => dispatchNodeData(nodeId, { prompt: event.target.value })}
-      />
-      {nodeType === "api_img2img" || nodeType === "api_inpaint" || nodeType === "video" ? (
-        <NodeInput nodeId={nodeId} data={data} field="baseAssetId" label="Base Asset" placeholder="连接图片或填写 asset id" />
-      ) : null}
-      {nodeType === "api_inpaint" ? <NodeInput nodeId={nodeId} data={data} field="maskAssetId" label="Mask Asset" placeholder="mask asset id" /> : null}
+      <div className="node-empty-state">
+        {status === "failed"
+          ? stringValue(data.errorMessage) || "执行失败"
+          : nodeType === "api_text2img"
+            ? "连接提示词节点后生成"
+            : "连接图片和提示词节点后生成"}
+      </div>
     </div>
   );
 }

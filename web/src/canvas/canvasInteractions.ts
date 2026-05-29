@@ -1,4 +1,4 @@
-import type { CanvasNode, CanvasNodeKind } from "./flowTypes";
+import type { CanvasEdge, CanvasNode, CanvasNodeKind } from "./flowTypes";
 
 export type CanvasViewport = { x: number; y: number; zoom: number };
 export type CanvasPoint = { x: number; y: number };
@@ -33,6 +33,54 @@ export function canvasPanViewport(
     ...viewport,
     x: viewport.x + drag.clientX - drag.startX,
     y: viewport.y + drag.clientY - drag.startY
+  };
+}
+
+export function nodePositionFromViewport(
+  viewport: CanvasViewport,
+  viewportSize: { width: number; height: number },
+  nodeSize: { width: number; height: number }
+): CanvasPoint {
+  return {
+    x: (viewportSize.width / 2 - viewport.x) / viewport.zoom - nodeSize.width / 2,
+    y: (viewportSize.height / 2 - viewport.y) / viewport.zoom - nodeSize.height / 2
+  };
+}
+
+export function cloneSelectedSubgraph(
+  graph: { nodes: readonly CanvasNode[]; edges: readonly CanvasEdge[] },
+  selectedIds: readonly string[],
+  offset: CanvasPoint,
+  ids: { nodePrefix: string; edgePrefix: string } = {
+    nodePrefix: `node_${Date.now().toString(36)}`,
+    edgePrefix: `edge_${Date.now().toString(36)}`
+  }
+): { nodes: CanvasNode[]; edges: CanvasEdge[]; idMap: Map<string, string> } {
+  const selected = new Set(selectedIds);
+  const idMap = new Map<string, string>();
+  const selectedNodes = graph.nodes.filter((node) => selected.has(node.id));
+
+  for (const node of selectedNodes) {
+    idMap.set(node.id, `${ids.nodePrefix}_${node.id}`);
+  }
+
+  return {
+    nodes: selectedNodes.map((node) => ({
+      ...node,
+      id: idMap.get(node.id) ?? node.id,
+      x: node.x + offset.x,
+      y: node.y + offset.y,
+      data: { ...node.data },
+      status: "idle"
+    })),
+    edges: graph.edges
+      .filter((edge) => selected.has(edge.from) && selected.has(edge.to))
+      .map((edge) => ({
+        id: `${ids.edgePrefix}_${edge.id}`,
+        from: idMap.get(edge.from) ?? edge.from,
+        to: idMap.get(edge.to) ?? edge.to
+      })),
+    idMap
   };
 }
 

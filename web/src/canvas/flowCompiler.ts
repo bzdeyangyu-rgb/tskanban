@@ -62,7 +62,7 @@ export function compileShapesToSnapshot(input: {
     });
   }
 
-  return {
+  const snapshot = {
     canvasId: input.canvasId,
     sessionId: input.sessionId,
     nodes,
@@ -70,6 +70,7 @@ export function compileShapesToSnapshot(input: {
     viewport: input.viewport,
     selectedNodeId: input.selectedNodeId
   };
+  return normalizeGeneratorInputs(snapshot);
 }
 
 export function compileCanvasSnapshot(editor: Editor, canvasId: string, sessionId?: string): CanvasSnapshot {
@@ -114,4 +115,74 @@ function getArrowEndpoints(editor: Editor, shapes: TLShape[]): Record<string, Ar
 
 function numberProp(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeGeneratorInputs(snapshot: CanvasSnapshot): CanvasSnapshot {
+  const nodeMap = new Map(snapshot.nodes.map((node) => [node.id, node]));
+  const normalizedNodes = snapshot.nodes.map((node) => {
+    if (!["api_img2img", "api_inpaint", "video", "api_text2img"].includes(node.type)) {
+      return node;
+    }
+
+    const upstreamNodes = snapshot.edges
+      .filter((edge) => edge.to === node.id)
+      .map((edge) => nodeMap.get(edge.from))
+      .filter((upstream): upstream is CanvasNode => Boolean(upstream));
+    const prompt = promptFromUpstream(upstreamNodes);
+    const images = upstreamNodes.flatMap(imageAssetsFromNode);
+    const [firstImage] = images;
+    const inputAssetIds = images.map((image) => image.assetId);
+
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        ...(prompt ? { prompt } : {}),
+        ...(firstImage && node.type !== "api_text2img" ? { baseAssetId: firstImage.assetId } : {}),
+        ...(inputAssetIds.length ? { inputAssetIds } : {})
+      }
+    };
+  });
+
+  return { ...snapshot, nodes: normalizedNodes };
+}
+
+function promptFromUpstream(nodes: CanvasNode[]): string {
+  const promptNode = nodes.find((node) => ["prompt", "loop", "llm"].includes(node.type));
+  if (!promptNode) {
+    return "";
+  }
+  return stringValue(promptNode.data.text || promptNode.data.prompt).trim();
+}
+
+function imageAssetsFromNode(node: CanvasNode): Array<{ assetId: string; url?: string }> {
+  if (node.type === "image") {
+    const assetId = stringValue(node.data.assetId);
+    return assetId ? [{ assetId, url: stringValue(node.data.url) || undefined }] : [];
+  }
+
+  if (node.type === "output" && Array.isArray(node.data.outputs)) {
+    const selectedOutputAssetId = stringValue(node.data.selectedOutputAssetId);
+    const outputs = node.data.outputs.filter(isOutputAsset);
+    const selected = selectedOutputAssetId ? outputs.find((asset) => asset.assetId === selectedOutputAssetId) : undefined;
+    return selected ? [selected] : outputs.slice(-1);
+  }
+
+  return [];
+}
+
+function stringValue(value: unknown): string {
+  if (typeof value === "number") {
+    return String(value);
+  }
+  return typeof value === "string" ? value : "";
+}
+
+function isOutputAsset(value: unknown): value is { assetId: string; url: string } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as { assetId?: unknown }).assetId === "string" &&
+      typeof (value as { url?: unknown }).url === "string"
+  );
 }
