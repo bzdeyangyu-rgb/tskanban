@@ -15,6 +15,7 @@
 | A 样例级 UI 系统 | `D:/Tskanban/.worktrees/phase-one-ui-system` | `codex/phase-one-ui-system` | 进行中 | 产品壳、公共 UI、样式 token |
 | C 图像 API 真实性 | `D:/Tskanban/.worktrees/phase-one-image-api` | `codex/phase-one-image-api` | 进行中 | `imageApi`、API runner、图像 API 测试 |
 | E 历史日志保存 | `D:/Tskanban/.worktrees/phase-one-history-logs` | `codex/phase-one-history-logs` | 进行中 | 画布保存、session、logger、route、保存/日志测试 |
+| H Output / 历史体验 | `D:/Tskanban/.worktrees/phase-one-output-history` | `codex/phase-one-output-history` | 进行中 | 运行历史、Output 资产、来源链、RAG 面板 |
 
 ## 主进程职责
 
@@ -63,4 +64,3 @@ npm run build
 - [ ] E 是否实现 deletedAt/restore 和重试分类。
 - [ ] 三条轨道是否都能独立 build。
 - [ ] 合并前是否有可见 UI 残留文案。
-
