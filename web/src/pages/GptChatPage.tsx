@@ -2,46 +2,26 @@ import React from "react";
 
 export function GptChatPage() {
   return (
-    <section className="feature-page" data-feature-layout="three-column" aria-label="GPT 对话">
-      <aside className="feature-column feature-params">
-        <span className="feature-column-label">参数区</span>
+    <section className="chat-page" data-chat-layout="thread-composer" aria-label="GPT 对话">
+      <header className="chat-page-head">
         <h1>GPT 对话</h1>
-        <label className="feature-upload">
-          <span>图片附件</span>
-          <input type="file" accept="image/*" multiple />
-          <small>可附加图片作为讨论上下文</small>
-        </label>
-        <label className="feature-field">
-          <span>对话内容</span>
-          <textarea defaultValue="帮我把这段画面描述优化成稳定的生成提示词" />
-        </label>
-        <label className="feature-field">
-          <span>提示词优化</span>
-          <select defaultValue="结构化优化">
-            <option>结构化优化</option>
-            <option>流程建议</option>
-            <option>创意讨论</option>
-          </select>
-        </label>
-        <button className="feature-primary" type="button">
+        <span>需要可用 API 配置后发送</span>
+      </header>
+      <main className="chat-thread" aria-label="对话消息">
+        <article className="chat-message is-assistant">
+          <strong>GPT</strong>
+          <p>把你的问题、提示词或图片编辑想法发给我。API 配置完成后，这里会显示真实回复。</p>
+        </article>
+      </main>
+      <form className="chat-composer" aria-label="发送消息">
+        <button type="button" className="chat-attach" title="添加图片">
+          +
+        </button>
+        <textarea placeholder="输入你要问 GPT 的内容" />
+        <button type="button" className="chat-send">
           发送
         </button>
-      </aside>
-
-      <main className="feature-column feature-workspace">
-        <span className="feature-column-label">工作区</span>
-        <div className="feature-chat-window">
-          <div className="feature-chat-message is-user">请优化提示词。</div>
-          <div className="feature-chat-message">建议拆分为主体、材质、光线、构图和负面约束。</div>
-        </div>
-      </main>
-
-      <aside className="feature-column feature-management">
-        <span className="feature-column-label">管理区</span>
-        <h2>对话历史</h2>
-        <div className="feature-history-item">提示词优化 · 当前会话</div>
-        <div className="feature-history-item">流程建议 · 草稿</div>
-      </aside>
+      </form>
     </section>
   );
 }

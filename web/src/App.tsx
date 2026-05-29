@@ -13,13 +13,11 @@ import {
   Group,
   Image,
   ImagePlus,
-  Languages,
   Layers,
   Link,
   ListTodo,
   MessageSquare,
   MessageSquareText,
-  Moon,
   Play,
   Plus,
   RefreshCw,
@@ -199,8 +197,7 @@ export function App() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [activePage, setActivePage] = useState<StudioPageId>("canvas");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [language, setLanguage] = useState<"zh" | "en">("zh");
+  const theme = "dark";
   const [dragLink, setDragLink] = useState<DragLink | null>(null);
   const [linkCommandMenu, setLinkCommandMenu] = useState<LinkCommandMenu | null>(null);
   const [genes, setGenes] = useState<GeneTemplate[]>(() => loadGenes(typeof window === "undefined" ? undefined : window.localStorage));
@@ -601,10 +598,6 @@ export function App() {
   }, []);
 
   const handleDeleteGene = useCallback((gene: GeneTemplate) => {
-    const confirmed = window.confirm(`删除 ${gene.name}？`);
-    if (!confirmed) {
-      return;
-    }
     setGenes((current) => current.filter((item) => item.id !== gene.id));
     setStatus(`已删除 ${gene.name}`);
   }, []);
@@ -908,15 +901,11 @@ export function App() {
     <ProductShell>
       <StudioSidebar
         activePage={activePage}
-        language={language}
-        theme={theme}
-        onLanguageToggle={() => setLanguage((current) => (current === "zh" ? "en" : "zh"))}
         onSwitch={(page) => {
           setActivePage(page);
           setDrawerMode(null);
           setLinkCommandMenu(null);
         }}
-        onThemeToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
       />
       <section
         className={`studio-stage ${activePage === "canvas" && isCanvasOpen ? "is-editor" : "is-gate"}`}
@@ -1027,18 +1016,10 @@ export function App() {
 
 function StudioSidebar({
   activePage,
-  language: _language,
-  theme,
-  onLanguageToggle,
-  onSwitch,
-  onThemeToggle
+  onSwitch
 }: {
   activePage: StudioPageId;
-  language: "zh" | "en";
-  theme: "dark" | "light";
-  onLanguageToggle: () => void;
   onSwitch: (page: StudioPageId) => void;
-  onThemeToggle: () => void;
 }) {
   return (
     <aside className="studio-sidebar" aria-label="主导航">
@@ -1065,19 +1046,6 @@ function StudioSidebar({
         })}
       </nav>
       <div className="studio-side-actions" aria-label="辅助操作">
-        <Tooltip text="黑夜模式">
-          <ReferenceButton
-            icon={Moon}
-            isActive={theme === "dark"}
-            label="黑夜模式"
-            title="黑夜模式"
-            variant="side"
-            onClick={onThemeToggle}
-          />
-        </Tooltip>
-        <Tooltip text="中文">
-          <ReferenceButton icon={Languages} label="中文" title="中文" variant="side" onClick={onLanguageToggle} />
-        </Tooltip>
         <Tooltip text="API 设置">
           <ReferenceButton
             icon={Link}

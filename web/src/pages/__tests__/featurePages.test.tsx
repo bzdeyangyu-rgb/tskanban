@@ -25,7 +25,7 @@ function installWindow() {
 describe("产品壳", () => {
   beforeEach(() => installWindow());
 
-  it("显示样例侧栏和底部设置入口", () => {
+  it("显示样例侧栏和真实可用的底部设置入口", () => {
     const html = renderToStaticMarkup(<App />);
 
     expect(html).toContain('data-product-shell="reference"');
@@ -38,8 +38,8 @@ describe("产品壳", () => {
     expect(html).toContain("在线生图");
     expect(html).toContain("GPT 对话");
     expect(html).toContain("无限画布");
-    expect(html).toContain("黑夜模式");
-    expect(html).toContain("中文");
+    expect(html).not.toContain("黑夜模式");
+    expect(html).not.toContain("中文");
     expect(html).toContain("API 设置");
     expect(html).toContain("Side");
   });
@@ -106,12 +106,14 @@ describe("功能页面", () => {
     expect(html).toContain("历史");
   });
 
-  it("GPT 对话包含图片附件、提示词优化和对话历史", () => {
+  it("GPT 对话是消息流和底部输入框结构", () => {
     const html = renderToStaticMarkup(<GptChatPage />);
 
-    expectFeatureLayout(html);
-    expect(html).toContain("图片附件");
-    expect(html).toContain("提示词优化");
-    expect(html).toContain("对话历史");
+    expect(html).toContain('data-chat-layout="thread-composer"');
+    expect(html).toContain("chat-thread");
+    expect(html).toContain("chat-composer");
+    expect(html).toContain("输入你要问 GPT 的内容");
+    expect(html).not.toContain('data-feature-layout="three-column"');
+    expect(html).not.toContain("参数区");
   });
 });

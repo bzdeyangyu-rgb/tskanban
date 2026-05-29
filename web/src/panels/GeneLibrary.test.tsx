@@ -44,6 +44,10 @@ describe("GeneLibraryPopover", () => {
     expect(html).toContain("2 个基因");
     expect(html).toContain("1 提示词");
     expect(html).toContain("1 流程");
+    expect(html).toContain("当前选中");
+    expect(html).toContain("选中+输出");
+    expect(html).toContain("全画布流程");
+    expect(html).not.toContain("加输出");
     expect(html).toContain("夜景提示词");
     expect(html).toContain("生成提示词");
     expect(html).toContain("出图流程");

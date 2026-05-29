@@ -109,30 +109,7 @@ function NodeEditor({
               <input className="field-control" value={stringValue(meta.data.model)} onChange={updateString("model")} />
             )}
           </label>
-          <label className="field">
-            Prompt 覆盖
-            <textarea
-              className="field-control field-textarea"
-              value={stringValue(meta.data.prompt)}
-              onChange={updateString("prompt")}
-            />
-          </label>
-          <label className="field">
-            Negative Prompt
-            <textarea
-              className="field-control field-textarea"
-              value={stringValue(meta.data.negativePrompt)}
-              onChange={updateString("negativePrompt")}
-            />
-          </label>
         </>
-      ) : null}
-
-      {meta.nodeType === "api_img2img" || meta.nodeType === "api_inpaint" || meta.nodeType === "video" ? (
-        <label className="field">
-          Base Asset ID
-          <input className="field-control" value={stringValue(meta.data.baseAssetId)} onChange={updateString("baseAssetId")} />
-        </label>
       ) : null}
 
       {meta.nodeType === "api_inpaint" ? (

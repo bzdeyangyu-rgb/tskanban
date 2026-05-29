@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dna, GitBranch, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import type { WorkflowGeneScope } from "../canvas/ReferenceCanvas";
 import { countGeneTypes, geneDisplayMeta, type GeneTemplate } from "./geneLibraryModel";
@@ -23,6 +23,7 @@ export function GeneLibraryPopover({
   onUseGene: (gene: GeneTemplate) => void;
 }) {
   const counts = countGeneTypes(genes);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   return (
     <div className="gene-library-popover" role="dialog" aria-label="基因库">
@@ -64,7 +65,10 @@ export function GeneLibraryPopover({
                   type="button"
                   className={`gene-chip is-${gene.type}`}
                   data-testid="gene-chip"
-                  onClick={() => onUseGene(gene)}
+                  onClick={() => {
+                    setPendingDeleteId(null);
+                    onUseGene(gene);
+                  }}
                   title={gene.type === "prompt" ? gene.prompt : `${gene.nodeCount} 个节点`}
                 >
                   <span className="gene-chip-topline">
@@ -80,13 +84,43 @@ export function GeneLibraryPopover({
                   <small className="gene-chip-detail">{meta.detail}</small>
                 </button>
                 <div className="gene-tile-actions" aria-label={`${gene.name} 操作`}>
-                  <button type="button" data-testid="gene-rename-button" onClick={() => onRenameGene(gene)} title="重命名">
+                  <button
+                    type="button"
+                    data-testid="gene-rename-button"
+                    onClick={() => {
+                      setPendingDeleteId(null);
+                      onRenameGene(gene);
+                    }}
+                    title="重命名"
+                  >
                     <Pencil aria-hidden="true" size={12} />
                   </button>
-                  <button type="button" data-testid="gene-delete-button" onClick={() => onDeleteGene(gene)} title="删除">
+                  <button
+                    type="button"
+                    data-testid="gene-delete-button"
+                    onClick={() => setPendingDeleteId((current) => (current === gene.id ? null : gene.id))}
+                    title="删除"
+                  >
                     <Trash2 aria-hidden="true" size={12} />
                   </button>
                 </div>
+                {pendingDeleteId === gene.id ? (
+                  <div className="gene-delete-confirm" role="alert">
+                    <span>删除这个基因？</span>
+                    <button type="button" onClick={() => setPendingDeleteId(null)}>
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDeleteGene(gene);
+                        setPendingDeleteId(null);
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
           })
@@ -94,7 +128,15 @@ export function GeneLibraryPopover({
           <div className="gene-empty">还没有基因</div>
         )}
       </div>
-      <button type="button" className="gene-add-button" data-testid="gene-add-button" onClick={onAddGene}>
+      <button
+        type="button"
+        className="gene-add-button"
+        data-testid="gene-add-button"
+        onClick={() => {
+          setPendingDeleteId(null);
+          onAddGene();
+        }}
+      >
         <Plus aria-hidden="true" size={16} />
         添加基因
       </button>
@@ -103,7 +145,7 @@ export function GeneLibraryPopover({
 }
 
 const geneScopeOptions: Array<{ scope: WorkflowGeneScope; label: string; title: string }> = [
-  { scope: "selection", label: "选中", title: "只保存当前选中的节点和内部连线" },
-  { scope: "selectionWithOutputs", label: "加输出", title: "保存选中节点，并带上直接连接的 Output 节点" },
-  { scope: "canvas", label: "全画布", title: "保存当前画布上的所有节点和连线" }
+  { scope: "selection", label: "当前选中", title: "只保存选中的节点和它们之间的连线" },
+  { scope: "selectionWithOutputs", label: "选中+输出", title: "保存选中节点，并带上直接相连的 Output 节点" },
+  { scope: "canvas", label: "全画布流程", title: "保存当前画布上的全部节点和连线" }
 ];
