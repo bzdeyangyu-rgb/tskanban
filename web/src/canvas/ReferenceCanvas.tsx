@@ -26,6 +26,13 @@ import {
   type WheelEvent as ReactWheelEvent
 } from "react";
 import type { ApiProvider } from "../api/client";
+import {
+  canvasPanViewport,
+  canvasShortcutAllowed,
+  linkReleaseAction,
+  nodeIdsInSelection,
+  resizeNodeFromBottomRight
+} from "./canvasInteractions";
 import type { CanvasEdge, CanvasNode, CanvasNodeKind, CanvasNodeStatus, CanvasSnapshot } from "./flowTypes";
 import type { NodeDefinition, TshuabuNodeMeta } from "./shapeUtils";
 
@@ -219,7 +226,7 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+      if (!canvasShortcutAllowed(target)) {
         return;
       }
       if (event.key !== "Delete" && event.key !== "Backspace") {
@@ -250,24 +257,24 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
         setNodes((current) =>
           current.map((node) =>
             node.id === dragState.id
-              ? {
-                  ...node,
-                  x: dragState.x + Math.min(dx, dragState.width - MIN_NODE_WIDTH),
-                  y: dragState.y,
-                  width: Math.max(MIN_NODE_WIDTH, dragState.width - dx),
-                  height: Math.max(MIN_NODE_HEIGHT, dragState.height + dy)
-                }
+              ? resizeNodeFromBottomRight(
+                  { ...node, x: dragState.x, y: dragState.y, width: dragState.width, height: dragState.height },
+                  { dx, dy, minWidth: MIN_NODE_WIDTH, minHeight: MIN_NODE_HEIGHT }
+                )
               : node
           )
         );
       }
 
       if (dragState?.type === "pan") {
-        setViewport((current) => ({
-          ...current,
-          x: dragState.x + event.clientX - dragState.startX,
-          y: dragState.y + event.clientY - dragState.startY
-        }));
+        setViewport((current) =>
+          canvasPanViewport({ ...current, x: dragState.x, y: dragState.y }, {
+            startX: dragState.startX,
+            startY: dragState.startY,
+            clientX: event.clientX,
+            clientY: event.clientY
+          })
+        );
       }
 
       if (dragState?.type === "select") {
@@ -285,29 +292,29 @@ export const ReferenceCanvas = forwardRef<ReferenceCanvasHandle, ReferenceCanvas
       if (dragLink) {
         const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
         const targetNodeId = target?.closest<HTMLElement>("[data-reference-node-id]")?.dataset.referenceNodeId;
-        if (targetNodeId && targetNodeId !== dragLink.fromId) {
+        const point = screenToCanvas(event.clientX, event.clientY);
+        const action = linkReleaseAction(dragLink, targetNodeId, point);
+        if (action.type === "connect") {
           setEdges((current) => [
-            ...current.filter((edge) => !(edge.from === dragLink.fromId && edge.to === targetNodeId)),
-            { id: `edge_${Date.now().toString(36)}_${edgeCounterRef.current++}`, from: dragLink.fromId, to: targetNodeId }
+            ...current.filter((edge) => !(edge.from === action.fromId && edge.to === action.toId)),
+            { id: `edge_${Date.now().toString(36)}_${edgeCounterRef.current++}`, from: action.fromId, to: action.toId }
           ]);
           onStatus("已建立节点连线");
         } else {
-          const point = screenToCanvas(event.clientX, event.clientY);
           setCreateMenu({
-            fromId: dragLink.fromId,
-            fromType: dragLink.fromType,
+            fromId: action.fromId,
+            fromType: action.fromType,
             x: event.clientX,
             y: event.clientY,
-            canvasX: point.x,
-            canvasY: point.y
+            canvasX: action.canvasX,
+            canvasY: action.canvasY
           });
         }
       }
       if (dragState?.type === "select") {
         const start = screenToCanvas(dragState.startX, dragState.startY);
         const end = screenToCanvas(event.clientX, event.clientY);
-        const rect = normalizedRect(start.x, start.y, end.x, end.y);
-        const picked = nodes.filter((node) => rectIntersectsNode(rect, node)).map((node) => node.id);
+        const picked = nodeIdsInSelection(nodes, start, end);
         setSelectedIds(picked);
         onStatus(picked.length > 0 ? `已框选 ${picked.length} 个节点` : "未框选到节点");
       }
@@ -1191,28 +1198,6 @@ export function edgeActionPosition(
 
 function nodePortPoint(node: Pick<CanvasNode, "x" | "y" | "width" | "height">): { x: number; y: number } {
   return { x: node.x + node.width, y: node.y + node.height / 2 };
-}
-
-function normalizedRect(x1: number, y1: number, x2: number, y2: number): { left: number; top: number; right: number; bottom: number } {
-  return {
-    left: Math.min(x1, x2),
-    top: Math.min(y1, y2),
-    right: Math.max(x1, x2),
-    bottom: Math.max(y1, y2)
-  };
-}
-
-function rectIntersectsNode(
-  rect: { left: number; top: number; right: number; bottom: number },
-  node: CanvasNode
-): boolean {
-  const nodeRect = {
-    left: node.x,
-    top: node.y,
-    right: node.x + node.width,
-    bottom: node.y + node.height
-  };
-  return rect.left <= nodeRect.right && rect.right >= nodeRect.left && rect.top <= nodeRect.bottom && rect.bottom >= nodeRect.top;
 }
 
 export function collectDragNodeIds(nodes: CanvasNode[], selectedIds: string[], activeId: string): string[] {
