@@ -67,6 +67,12 @@ import { AssetImportPanel } from "./panels/AssetImportPanel";
 import { CanvasPersistenceBar } from "./panels/CanvasPersistenceBar";
 import { GeneLibraryPopover } from "./panels/GeneLibrary";
 import { featurePageConfig, managementStatsForFeature, type ApiFeaturePageId } from "./panels/studioFeatureModel";
+import { AngleControlPage } from "./pages/AngleControlPage";
+import { EnhancePage } from "./pages/EnhancePage";
+import { GptChatPage } from "./pages/GptChatPage";
+import { ImageEditPage } from "./pages/ImageEditPage";
+import { OnlineImagePage } from "./pages/OnlineImagePage";
+import { TextToImagePage } from "./pages/TextToImagePage";
 import {
   createPromptGene,
   createWorkflowGene,
@@ -994,7 +1000,7 @@ export function App() {
             </ReferenceModal>
           </section>
         ) : (
-          <StudioApiPage pageId={activePage} providers={providers} />
+          <FeaturePageSwitch pageId={activePage} />
         )}
         <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
       </section>
@@ -1069,6 +1075,23 @@ function StudioSidebar({
       <div className="studio-author">Side</div>
     </aside>
   );
+}
+
+function FeaturePageSwitch({ pageId }: { pageId: ApiPageKind }) {
+  switch (pageId) {
+    case "zimage":
+      return <TextToImagePage />;
+    case "enhance":
+      return <EnhancePage />;
+    case "klein":
+      return <ImageEditPage />;
+    case "angle":
+      return <AngleControlPage />;
+    case "online":
+      return <OnlineImagePage />;
+    case "gpt-chat":
+      return <GptChatPage />;
+  }
 }
 
 function StudioApiPage({
