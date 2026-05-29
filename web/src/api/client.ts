@@ -30,6 +30,15 @@ export type ProviderCapability = {
 };
 
 export type ProviderCapabilities = Record<"text2img" | "img2img" | "inpaint" | "video" | "llm", ProviderCapability>;
+export type ProviderReadiness =
+  | { ready: false; reason: "no_provider"; message: string }
+  | { ready: false; reason: "missing_key"; message: string; primaryProviderId: string }
+  | { ready: true; reason: "ready"; message: string; primaryProviderId: string };
+
+export type ProviderListResponse = {
+  providers: ApiProvider[];
+  readiness: ProviderReadiness;
+};
 
 export type FlowExecutionNode = {
   nodeId: string;
@@ -180,8 +189,8 @@ export async function executeCanvasFlow(flow: CanvasSnapshot, targetNodeId?: str
   });
   const json = await response.json();
 
-  if (!json.ok && !json.data) {
-    throw new Error(json.error || "流程执行失败");
+  if (!json.ok) {
+    throw new Error(json.error || json.data?.run?.errorMessage || "流程执行失败");
   }
 
   return json.data as FlowExecutionResponse;
@@ -287,16 +296,35 @@ export async function fetchRagEvents(query: {
   return json.data as RagEvent[];
 }
 
-export async function fetchProviders(): Promise<ApiProvider[]> {
+function providerReadinessFromJson(json: { meta?: { readiness?: ProviderReadiness } }, providers: ApiProvider[]): ProviderReadiness {
+  if (json.meta?.readiness) {
+    return json.meta.readiness;
+  }
+  const primary = providers.find((provider) => provider.primary && provider.enabled) ?? providers.find((provider) => provider.enabled);
+  if (!primary) {
+    return { ready: false, reason: "no_provider", message: "未配置 API 平台" };
+  }
+  if (!primary.hasKey) {
+    return { ready: false, reason: "missing_key", message: `${primary.name} 缺少 API Key`, primaryProviderId: primary.id };
+  }
+  return { ready: true, reason: "ready", message: `${primary.name} 已可用于生成`, primaryProviderId: primary.id };
+}
+
+export async function fetchProviderList(): Promise<ProviderListResponse> {
   const response = await fetch("/api/providers");
   const json = await response.json();
   if (!json.ok) {
     throw new Error(json.error || "读取 API 平台失败");
   }
-  return json.data as ApiProvider[];
+  const providers = json.data as ApiProvider[];
+  return { providers, readiness: providerReadinessFromJson(json, providers) };
 }
 
-export async function saveProviders(providers: EditableApiProvider[]): Promise<ApiProvider[]> {
+export async function fetchProviders(): Promise<ApiProvider[]> {
+  return (await fetchProviderList()).providers;
+}
+
+export async function saveProviderList(providers: EditableApiProvider[]): Promise<ProviderListResponse> {
   const response = await fetch("/api/providers", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -306,7 +334,12 @@ export async function saveProviders(providers: EditableApiProvider[]): Promise<A
   if (!json.ok) {
     throw new Error(json.error || "保存 API 平台失败");
   }
-  return json.data as ApiProvider[];
+  const saved = json.data as ApiProvider[];
+  return { providers: saved, readiness: providerReadinessFromJson(json, saved) };
+}
+
+export async function saveProviders(providers: EditableApiProvider[]): Promise<ApiProvider[]> {
+  return (await saveProviderList(providers)).providers;
 }
 
 export type ProviderModels = {

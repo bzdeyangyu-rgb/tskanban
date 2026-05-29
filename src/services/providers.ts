@@ -38,6 +38,10 @@ export type PublicApiProvider = Omit<ApiProvider, "apiKey"> & {
   keyPreview: string;
   capabilities: ProviderCapabilities;
 };
+export type ProviderReadiness =
+  | { ready: false; reason: "no_provider"; message: string }
+  | { ready: false; reason: "missing_key"; message: string; primaryProviderId: string }
+  | { ready: true; reason: "ready"; message: string; primaryProviderId: string };
 
 const DEFAULT_PROVIDERS_FILE = path.join(process.cwd(), "logs", "providers.json");
 
@@ -94,10 +98,41 @@ export function createProviderStore(filePath = DEFAULT_PROVIDERS_FILE) {
     return provider;
   }
 
+  async function describeReadiness(): Promise<ProviderReadiness> {
+    const providers = await loadProviders();
+    const enabled = providers.filter((provider) => provider.enabled);
+    const primary = enabled.find((provider) => provider.primary) ?? enabled[0];
+
+    if (!primary) {
+      return {
+        ready: false,
+        reason: "no_provider",
+        message: "未配置 API 平台"
+      };
+    }
+
+    if (!primary.apiKey?.trim()) {
+      return {
+        ready: false,
+        reason: "missing_key",
+        message: `${primary.name} 缺少 API Key`,
+        primaryProviderId: primary.id
+      };
+    }
+
+    return {
+      ready: true,
+      reason: "ready",
+      message: `${primary.name} 已可用于生成`,
+      primaryProviderId: primary.id
+    };
+  }
+
   return {
     loadProviders,
     saveProviders,
     getProvider,
+    describeReadiness,
     filePath
   };
 }

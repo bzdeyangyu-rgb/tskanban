@@ -253,7 +253,8 @@ apiRouter.get("/sessions/:sessionId/assets/:assetId/provenance", async (req, res
 apiRouter.get("/providers", async (_req, res) => {
   try {
     const providers = await providerStore.loadProviders();
-    res.json({ ok: true, data: providers.map(publicProvider) });
+    const readiness = await providerStore.describeReadiness();
+    res.json({ ok: true, data: providers.map(publicProvider), meta: { readiness } });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ ok: false, error: message });
@@ -264,7 +265,8 @@ apiRouter.put("/providers", async (req, res) => {
   try {
     const input = saveProvidersSchema.parse(req.body ?? {});
     const providers = await providerStore.saveProviders(input.providers);
-    res.json({ ok: true, data: providers.map(publicProvider) });
+    const readiness = await providerStore.describeReadiness();
+    res.json({ ok: true, data: providers.map(publicProvider), meta: { readiness } });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(400).json({ ok: false, error: message });

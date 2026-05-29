@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchProviderModels,
-  saveProviders,
+  saveProviderList,
   testProviderConnection,
   type ApiProvider,
   type EditableApiProvider,
   type ProviderCapabilities,
-  type ProviderCapabilityStatus
+  type ProviderCapabilityStatus,
+  type ProviderReadiness
 } from "../api/client";
 
 type ApiSettingsProps = {
@@ -17,6 +18,7 @@ type ApiSettingsProps = {
 export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) {
   const [draft, setDraft] = useState<EditableApiProvider>(() => emptyProvider());
   const [status, setStatus] = useState("");
+  const [readiness, setReadiness] = useState<ProviderReadiness>(() => readinessFromProviders(providers));
 
   useEffect(() => {
     setDraft(
@@ -24,6 +26,7 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
         ? { ...providers[0], capabilities: providers[0].capabilities ?? normalizeProviderCapabilities(providers[0]), apiKey: "" }
         : emptyProvider()
     );
+    setReadiness(readinessFromProviders(providers));
   }, [providers]);
 
   const modelCount = useMemo(
@@ -38,9 +41,10 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
   const handleSave = async () => {
     try {
       setStatus("保存中...");
-      const saved = await saveProviders(mergeDraft(providers, draft));
-      onProvidersChange(saved);
-      setStatus("已保存");
+      const saved = await saveProviderList(mergeDraft(providers, draft));
+      onProvidersChange(saved.providers);
+      setReadiness(saved.readiness);
+      setStatus(saved.readiness.message);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -120,6 +124,8 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
           新增
         </button>
       </div>
+
+      <p className={`api-readiness api-readiness-${readiness.reason}`}>{readiness.message}</p>
 
       {providers.length > 0 ? (
         <select className="field-control" value={draft.id} onChange={(event) => selectProvider(event.target.value)}>
@@ -251,6 +257,31 @@ function normalizeId(value: string): string {
 function mergeDraft(providers: ApiProvider[], draft: EditableApiProvider): EditableApiProvider[] {
   const existing = providers.filter((provider) => provider.id !== draft.id);
   return [{ ...draft, primary: true }, ...existing.map((provider) => ({ ...provider, primary: false }))];
+}
+
+function readinessFromProviders(providers: ApiProvider[]): ProviderReadiness {
+  const primary = providers.find((provider) => provider.primary && provider.enabled) ?? providers.find((provider) => provider.enabled);
+  if (!primary) {
+    return {
+      ready: false,
+      reason: "no_provider",
+      message: "未配置 API 平台，画布生成暂不可用。请填写请求地址、API Key，并保存。"
+    };
+  }
+  if (!primary.hasKey) {
+    return {
+      ready: false,
+      reason: "missing_key",
+      message: `${primary.name} 缺少 API Key，生成暂不可用。`,
+      primaryProviderId: primary.id
+    };
+  }
+  return {
+    ready: true,
+    reason: "ready",
+    message: `${primary.name} 已可用于生成。`,
+    primaryProviderId: primary.id
+  };
 }
 
 const capabilityKeys: Array<keyof ProviderCapabilities> = ["text2img", "img2img", "inpaint", "video", "llm"];

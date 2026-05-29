@@ -79,6 +79,56 @@ describe("provider store", () => {
     expect(loaded[0]?.apiKey).toBe("sk-old");
     expect(loaded[0]?.imageModels).toEqual(["gpt-image-2"]);
   });
+
+  it("describes provider readiness for empty, missing key, and configured states", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "providers-"));
+    const store = createProviderStore(path.join(tempDir, "providers.json"));
+
+    await expect(store.describeReadiness()).resolves.toEqual({
+      ready: false,
+      reason: "no_provider",
+      message: "未配置 API 平台"
+    });
+
+    await store.saveProviders([
+      {
+        id: "miku",
+        name: "Miku API",
+        baseUrl: "https://mikuapi.org/v1",
+        protocol: "openai",
+        enabled: true,
+        primary: true,
+        imageModels: ["gpt-image-2"]
+      }
+    ]);
+
+    await expect(store.describeReadiness()).resolves.toEqual({
+      ready: false,
+      reason: "missing_key",
+      message: "Miku API 缺少 API Key",
+      primaryProviderId: "miku"
+    });
+
+    await store.saveProviders([
+      {
+        id: "miku",
+        name: "Miku API",
+        baseUrl: "https://mikuapi.org/v1",
+        protocol: "openai",
+        enabled: true,
+        primary: true,
+        apiKey: "sk-1234567890abcdef",
+        imageModels: ["gpt-image-2"]
+      }
+    ]);
+
+    await expect(store.describeReadiness()).resolves.toEqual({
+      ready: true,
+      reason: "ready",
+      message: "Miku API 已可用于生成",
+      primaryProviderId: "miku"
+    });
+  });
 });
 
 describe("model classification", () => {

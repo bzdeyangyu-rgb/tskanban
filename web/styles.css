@@ -166,6 +166,31 @@ button {
   background: #ffffff;
 }
 
+.api-readiness {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.76);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.api-readiness-no_provider,
+.api-readiness-missing_key {
+  border-color: rgba(251, 191, 36, 0.34);
+  background: rgba(120, 53, 15, 0.22);
+  color: #fde68a;
+}
+
+.api-readiness-ready {
+  border-color: rgba(45, 212, 191, 0.28);
+  background: rgba(20, 83, 75, 0.22);
+  color: #99f6e4;
+}
+
 .compact {
   margin: 0;
 }
