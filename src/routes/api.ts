@@ -36,6 +36,7 @@ import type { FlowSnapshot } from "../flows/types";
 import { createApiFlowRunners } from "../flows/runners/api";
 import {
   fetchProviderModels,
+  providerProtocolSchema,
   providerStore,
   publicProvider,
   testProviderConnection
@@ -274,7 +275,8 @@ apiRouter.post("/providers/test-connection", async (req, res) => {
   try {
     const input = providerConnectionSchema.parse(req.body ?? {});
     const apiKey = await providerApiKey(input.providerId, input.apiKey);
-    const result = await testProviderConnection({ baseUrl: input.baseUrl, apiKey });
+    const protocol = providerProtocolSchema.catch("openai").parse(req.body?.protocol);
+    const result = await testProviderConnection({ baseUrl: input.baseUrl, apiKey, protocol });
     res.json({ ok: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -286,7 +288,8 @@ apiRouter.post("/providers/fetch-models", async (req, res) => {
   try {
     const input = providerConnectionSchema.parse(req.body ?? {});
     const apiKey = await providerApiKey(input.providerId, input.apiKey);
-    const result = await fetchProviderModels({ baseUrl: input.baseUrl, apiKey });
+    const protocol = providerProtocolSchema.catch("openai").parse(req.body?.protocol);
+    const result = await fetchProviderModels({ baseUrl: input.baseUrl, apiKey, protocol });
     res.json({ ok: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
