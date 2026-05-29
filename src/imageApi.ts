@@ -120,6 +120,7 @@ export function buildImageApiCall(input: {
   apiKey?: string | undefined;
   protocol?: "openai" | "apimart" | undefined;
 }): { url: string; payload: Record<string, unknown>; headers: Record<string, string> } {
+  validateImageRequest(input.request);
   const protocol = input.protocol ?? "openai";
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   const action = input.request.action;
@@ -144,6 +145,21 @@ function openAiCompatibleEndpoint(action: ImageAction): string {
     return "/images/edits";
   }
   return "/images/generations";
+}
+
+function validateImageRequest(request: ImageRequest): void {
+  if (request.action === "img2img" && !request.inputImage) {
+    throw new Error("img2img requires an input image");
+  }
+
+  if (request.action === "inpaint") {
+    if (!request.inputImage) {
+      throw new Error("inpaint requires an input image");
+    }
+    if (!request.maskImage) {
+      throw new Error("inpaint requires a mask image");
+    }
+  }
 }
 
 function normalizeToStringArray(value: unknown): string[] {
@@ -209,6 +225,7 @@ export async function generateImage(request: ImageRequest): Promise<ImageResult>
 }
 
 function buildEnvImageApiCall(request: ImageRequest, env: z.output<typeof envSchema>) {
+  validateImageRequest(request);
   const endpoint =
     request.action === "text2img"
       ? env.IMAGE_API_TEXT2IMG_PATH
@@ -223,8 +240,8 @@ function buildEnvImageApiCall(request: ImageRequest, env: z.output<typeof envSch
     prompt: request.prompt,
     negative_prompt: request.negativePrompt,
     ...request.params,
-    input_image: request.inputImage,
-    mask_image: request.maskImage
+    input_image: request.action === "img2img" || request.action === "inpaint" || request.action === "video" ? request.inputImage : undefined,
+    mask_image: request.action === "inpaint" ? request.maskImage : undefined
   };
   return {
     url,
@@ -247,11 +264,11 @@ function buildOpenAiCompatiblePayload(request: ImageRequest): Record<string, unk
     payload.n = numericCount;
   }
 
-  if (request.inputImage) {
+  if ((request.action === "img2img" || request.action === "inpaint" || request.action === "video") && request.inputImage) {
     payload.images = [{ image_url: request.inputImage }];
   }
 
-  if (request.maskImage) {
+  if (request.action === "inpaint" && request.maskImage) {
     payload.mask = { image_url: request.maskImage };
   }
 

@@ -220,6 +220,7 @@ async function persistGeneratedOutputs(
     outputAssets: outputAssets.map((asset) => ({ assetId: asset.assetId, url: asset.publicUrl })),
     data: {
       versionId: version.versionId,
+      mode: input.action,
       providerId: input.providerId,
       sourceRunId: input.sourceRunId,
       sourceNodeId: input.sourceNodeId,
@@ -229,6 +230,8 @@ async function persistGeneratedOutputs(
       params: input.params ?? {},
       parentAssetIds: input.parentAssetIds ?? [],
       inputAssetIds: input.parentAssetIds ?? [],
+      outputAssetIds: outputAssets.map((asset) => asset.assetId),
+      latencyMs: input.latencyMs,
       raw: input.result.raw
     }
   };
