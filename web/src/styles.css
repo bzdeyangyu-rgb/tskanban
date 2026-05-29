@@ -259,3 +259,25 @@
 .reference-product-shell .studio-api-page > .reference-modal .api-settings {
   width: 100% !important;
 }
+
+.reference-node .reference-node-resize {
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 12px 0 20px 0 !important;
+  cursor: nwse-resize !important;
+}
+
+.reference-node .reference-node-resize::after {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid rgba(216, 222, 233, 0.72);
+  border-bottom: 2px solid rgba(216, 222, 233, 0.72);
+  content: "";
+  pointer-events: none;
+}
