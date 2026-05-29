@@ -73,6 +73,27 @@ describe("run history model", () => {
     expect(model.outputAssetIds).toEqual(["asset_2", "asset_3", "asset_1"]);
   });
 
+  it("summarizes run status, latency, node counts, and output provenance", () => {
+    const model = buildRunHistoryModel(session());
+
+    expect(model.stats).toEqual({
+      runCount: 2,
+      successCount: 1,
+      failedCount: 1,
+      outputCount: 3,
+      totalLatencyMs: 300,
+      nodeCount: 0
+    });
+    expect(model.outputAssets[0]).toMatchObject({
+      assetId: "asset_2",
+      sourceRunId: "run_2",
+      sourceNodeId: "g2",
+      versionId: "v_0002",
+      action: "img2img",
+      status: "success"
+    });
+  });
+
   it("finds a run by id", () => {
     const model = buildRunHistoryModel(session());
 

@@ -368,6 +368,72 @@ button {
   white-space: nowrap;
 }
 
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.history-summary div,
+.history-output-assets button {
+  min-width: 0;
+  border: 1px solid #d7dfeb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.history-summary span,
+.history-output-assets span,
+.history-output-assets small {
+  display: block;
+  overflow: hidden;
+  color: #64748b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.history-summary strong,
+.history-output-assets strong {
+  display: block;
+  overflow: hidden;
+  color: #111827;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.history-output-assets {
+  display: grid;
+  gap: 6px;
+}
+
+.history-output-assets button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.history-output-assets button.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.history-error {
+  margin: 0;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 7px 8px;
+  color: #991b1b;
+  background: #fef2f2;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .history-run,
 .version-list {
   display: grid;
