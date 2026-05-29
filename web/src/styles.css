@@ -557,3 +557,115 @@
     min-height: 320px;
   }
 }
+
+.api-settings {
+  display: grid;
+  gap: 16px;
+  color: var(--ref-text);
+}
+
+.api-settings-head,
+.provider-capability-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.provider-summary span {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ref-line);
+  border-radius: 10px;
+  background: var(--ref-soft);
+  color: var(--ref-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.provider-capability-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ref-line);
+  border-radius: 14px;
+  background: var(--ref-soft);
+}
+
+.provider-capability-head strong {
+  color: var(--ref-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.provider-capability-head span {
+  color: var(--ref-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.provider-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.provider-capability {
+  min-width: 0;
+  min-height: 104px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--ref-line);
+  border-radius: 12px;
+  background: var(--ref-panel);
+}
+
+.provider-capability-label {
+  color: var(--ref-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.provider-capability-status {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--ref-active-text);
+  background: var(--ref-active);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.provider-capability-inferred .provider-capability-status {
+  color: var(--ref-text);
+  background: rgba(143, 154, 171, 0.22);
+}
+
+.provider-capability-unavailable .provider-capability-status {
+  color: var(--ref-muted);
+  background: transparent;
+  border: 1px solid var(--ref-line-strong);
+}
+
+.provider-capability small {
+  color: var(--ref-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+@media (max-width: 980px) {
+  .provider-summary,
+  .provider-capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

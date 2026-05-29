@@ -12,11 +12,24 @@ export type ApiProvider = {
   videoModels: string[];
   hasKey: boolean;
   keyPreview: string;
+  capabilities: ProviderCapabilities;
 };
 
 export type EditableApiProvider = ApiProvider & {
   apiKey?: string;
 };
+
+export type ProviderCapabilityStatus = "available" | "inferred" | "unavailable";
+
+export type ProviderCapability = {
+  label: string;
+  status: ProviderCapabilityStatus;
+  source: "model" | "protocol" | "none";
+  modelCount: number;
+  reason: string;
+};
+
+export type ProviderCapabilities = Record<"text2img" | "img2img" | "inpaint" | "video" | "llm", ProviderCapability>;
 
 export type FlowExecutionNode = {
   nodeId: string;
@@ -302,12 +315,14 @@ export type ProviderModels = {
   imageModels: string[];
   chatModels: string[];
   videoModels: string[];
+  capabilities: ProviderCapabilities;
 };
 
 export async function testProviderConnection(input: {
   providerId?: string;
   baseUrl: string;
   apiKey?: string;
+  protocol?: ApiProvider["protocol"];
 }): Promise<ProviderModels & { ok: boolean; message: string }> {
   const response = await fetch("/api/providers/test-connection", {
     method: "POST",
@@ -325,6 +340,7 @@ export async function fetchProviderModels(input: {
   providerId?: string;
   baseUrl: string;
   apiKey?: string;
+  protocol?: ApiProvider["protocol"];
 }): Promise<ProviderModels> {
   const response = await fetch("/api/providers/fetch-models", {
     method: "POST",

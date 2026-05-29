@@ -6,6 +6,17 @@ import { z } from "zod";
 export const providerProtocolSchema = z.enum(["openai", "apimart"]);
 export type ProviderProtocol = z.infer<typeof providerProtocolSchema>;
 export type ModelCategory = "image" | "chat" | "video";
+export type ProviderCapabilityKey = "text2img" | "img2img" | "inpaint" | "video" | "llm";
+export type ProviderCapabilityStatus = "available" | "inferred" | "unavailable";
+export type ProviderCapabilitySource = "model" | "protocol" | "none";
+export type ProviderCapability = {
+  label: string;
+  status: ProviderCapabilityStatus;
+  source: ProviderCapabilitySource;
+  modelCount: number;
+  reason: string;
+};
+export type ProviderCapabilities = Record<ProviderCapabilityKey, ProviderCapability>;
 
 export const apiProviderInputSchema = z.object({
   id: z.string().min(1).max(60),
@@ -25,6 +36,7 @@ export type ApiProvider = z.output<typeof apiProviderInputSchema>;
 export type PublicApiProvider = Omit<ApiProvider, "apiKey"> & {
   hasKey: boolean;
   keyPreview: string;
+  capabilities: ProviderCapabilities;
 };
 
 const DEFAULT_PROVIDERS_FILE = path.join(process.cwd(), "logs", "providers.json");
@@ -97,7 +109,8 @@ export function publicProvider(provider: ApiProvider): PublicApiProvider {
   return {
     ...rest,
     hasKey: Boolean(apiKey?.trim()),
-    keyPreview: previewKey(apiKey)
+    keyPreview: previewKey(apiKey),
+    capabilities: normalizeProviderCapabilities(provider)
   };
 }
 
@@ -138,10 +151,54 @@ export function classifyModelId(modelId: string): ModelCategory {
   return "chat";
 }
 
+export function normalizeProviderCapabilities(input: {
+  protocol: ProviderProtocol;
+  imageModels?: string[];
+  chatModels?: string[];
+  videoModels?: string[];
+}): ProviderCapabilities {
+  const imageModels = input.imageModels ?? [];
+  const chatModels = input.chatModels ?? [];
+  const videoModels = input.videoModels ?? [];
+  const protocolSupportsRichModes = input.protocol === "openai" || input.protocol === "apimart";
+
+  const fromModel = (label: string, modelCount: number): ProviderCapability => ({
+    label,
+    status: "available",
+    source: "model",
+    modelCount,
+    reason: `已识别 ${modelCount} 个相关模型`
+  });
+
+  const fromProtocol = (label: string): ProviderCapability => ({
+    label,
+    status: protocolSupportsRichModes ? "inferred" : "unavailable",
+    source: protocolSupportsRichModes ? "protocol" : "none",
+    modelCount: 0,
+    reason: protocolSupportsRichModes ? `${protocolLabel(input.protocol)} 协议按兼容能力推断` : "当前协议未声明该能力"
+  });
+
+  return {
+    text2img: imageModels.length > 0 ? fromModel("文生图", imageModels.length) : fromProtocol("文生图"),
+    img2img: imageModels.length > 0 ? fromModel("图生图", imageModels.length) : fromProtocol("图生图"),
+    inpaint: fromProtocol("局部重绘"),
+    video: videoModels.length > 0 ? fromModel("视频", videoModels.length) : fromProtocol("视频"),
+    llm: chatModels.length > 0 ? fromModel("LLM", chatModels.length) : fromProtocol("LLM")
+  };
+}
+
 export async function fetchProviderModels(input: {
   baseUrl: string;
   apiKey: string;
-}): Promise<{ total: number; all: string[]; imageModels: string[]; chatModels: string[]; videoModels: string[] }> {
+  protocol?: ProviderProtocol;
+}): Promise<{
+  total: number;
+  all: string[];
+  imageModels: string[];
+  chatModels: string[];
+  videoModels: string[];
+  capabilities: ProviderCapabilities;
+}> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   const response = await axios.get(`${baseUrl}/models`, {
     headers: {
@@ -166,12 +223,21 @@ export async function fetchProviderModels(input: {
       grouped.chatModels.push(id);
     }
   }
-  return { total: ids.length, all: ids, ...grouped };
+  return {
+    total: ids.length,
+    all: ids,
+    ...grouped,
+    capabilities: normalizeProviderCapabilities({
+      protocol: input.protocol ?? "openai",
+      ...grouped
+    })
+  };
 }
 
 export async function testProviderConnection(input: {
   baseUrl: string;
   apiKey: string;
+  protocol?: ProviderProtocol;
 }): Promise<{ ok: boolean; status: number; message: string } & Awaited<ReturnType<typeof fetchProviderModels>>> {
   const models = await fetchProviderModels(input);
   return {
@@ -222,4 +288,8 @@ function normalizePrimary(providers: ApiProvider[]): ApiProvider[] {
     ...provider,
     primary: provider.id === primaryId
   }));
+}
+
+function protocolLabel(protocol: ProviderProtocol): string {
+  return protocol === "apimart" ? "APIMart 异步" : "OpenAI 兼容";
 }

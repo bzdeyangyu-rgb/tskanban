@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   classifyModelId,
   createProviderStore,
+  normalizeProviderCapabilities,
   publicProvider,
   type ApiProviderInput
 } from "./providers";
@@ -85,5 +86,76 @@ describe("model classification", () => {
     expect(classifyModelId("gpt-image-2")).toBe("image");
     expect(classifyModelId("sora-2")).toBe("video");
     expect(classifyModelId("gpt-5.2")).toBe("chat");
+  });
+});
+
+describe("provider capability normalization", () => {
+  it("marks text2img available when image models exist", () => {
+    const capabilities = normalizeProviderCapabilities({
+      protocol: "openai",
+      imageModels: ["gpt-image-2"],
+      chatModels: [],
+      videoModels: []
+    });
+
+    expect(capabilities.text2img.status).toBe("available");
+  });
+
+  it("marks img2img available for image models and protocol inference", () => {
+    const imageModelCapabilities = normalizeProviderCapabilities({
+      protocol: "openai",
+      imageModels: ["gpt-image-2"],
+      chatModels: [],
+      videoModels: []
+    });
+    const protocolCapabilities = normalizeProviderCapabilities({
+      protocol: "apimart",
+      imageModels: [],
+      chatModels: [],
+      videoModels: []
+    });
+
+    expect(imageModelCapabilities.img2img.status).toBe("available");
+    expect(protocolCapabilities.img2img.status).toBe("inferred");
+  });
+
+  it("keeps openai and apimart inferred capability states visible", () => {
+    const openai = normalizeProviderCapabilities({
+      protocol: "openai",
+      imageModels: [],
+      chatModels: [],
+      videoModels: []
+    });
+    const apimart = normalizeProviderCapabilities({
+      protocol: "apimart",
+      imageModels: [],
+      chatModels: [],
+      videoModels: []
+    });
+
+    expect(openai.inpaint.status).toBe("inferred");
+    expect(openai.video.status).toBe("inferred");
+    expect(openai.llm.status).toBe("inferred");
+    expect(apimart.inpaint.status).toBe("inferred");
+    expect(apimart.video.status).toBe("inferred");
+    expect(apimart.llm.status).toBe("inferred");
+  });
+
+  it("returns a stable capability field order and shape", () => {
+    const capabilities = normalizeProviderCapabilities({
+      protocol: "openai",
+      imageModels: ["gpt-image-2"],
+      chatModels: ["gpt-5.2"],
+      videoModels: ["sora-2"]
+    });
+
+    expect(Object.keys(capabilities)).toEqual(["text2img", "img2img", "inpaint", "video", "llm"]);
+    expect(capabilities).toMatchObject({
+      text2img: { label: "文生图", status: "available", source: "model" },
+      img2img: { label: "图生图", status: "available", source: "model" },
+      inpaint: { label: "局部重绘", status: "inferred", source: "protocol" },
+      video: { label: "视频", status: "available", source: "model" },
+      llm: { label: "LLM", status: "available", source: "model" }
+    });
   });
 });

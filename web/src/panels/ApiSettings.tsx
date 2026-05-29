@@ -4,7 +4,9 @@ import {
   saveProviders,
   testProviderConnection,
   type ApiProvider,
-  type EditableApiProvider
+  type EditableApiProvider,
+  type ProviderCapabilities,
+  type ProviderCapabilityStatus
 } from "../api/client";
 
 type ApiSettingsProps = {
@@ -17,7 +19,11 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    setDraft(providers[0] ? { ...providers[0], apiKey: "" } : emptyProvider());
+    setDraft(
+      providers[0]
+        ? { ...providers[0], capabilities: providers[0].capabilities ?? normalizeProviderCapabilities(providers[0]), apiKey: "" }
+        : emptyProvider()
+    );
   }, [providers]);
 
   const modelCount = useMemo(
@@ -46,7 +52,8 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
       const result = await testProviderConnection({
         providerId: draft.id,
         baseUrl: draft.baseUrl,
-        apiKey: draft.apiKey
+        apiKey: draft.apiKey,
+        protocol: draft.protocol
       });
       applyModels(result);
       setStatus(`验证通过，找到 ${result.total} 个模型`);
@@ -61,7 +68,8 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
       const result = await fetchProviderModels({
         providerId: draft.id,
         baseUrl: draft.baseUrl,
-        apiKey: draft.apiKey
+        apiKey: draft.apiKey,
+        protocol: draft.protocol
       });
       applyModels(result);
       setStatus(`已拉取 ${result.total} 个模型`);
@@ -70,19 +78,32 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
     }
   };
 
-  const applyModels = (result: { imageModels: string[]; chatModels: string[]; videoModels: string[] }) => {
+  const applyModels = (result: {
+    imageModels: string[];
+    chatModels: string[];
+    videoModels: string[];
+    capabilities?: ProviderCapabilities;
+  }) => {
     setDraft((current) => ({
       ...current,
       imageModels: result.imageModels,
       chatModels: result.chatModels,
-      videoModels: result.videoModels
+      videoModels: result.videoModels,
+      capabilities:
+        result.capabilities ??
+        normalizeProviderCapabilities({
+          ...current,
+          imageModels: result.imageModels,
+          chatModels: result.chatModels,
+          videoModels: result.videoModels
+        })
     }));
   };
 
   const selectProvider = (id: string) => {
     const provider = providers.find((item) => item.id === id);
     if (provider) {
-      setDraft({ ...provider, apiKey: "" });
+      setDraft({ ...provider, capabilities: provider.capabilities ?? normalizeProviderCapabilities(provider), apiKey: "" });
     }
   };
 
@@ -133,7 +154,10 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
           <select
             className="field-control"
             value={draft.protocol}
-            onChange={(event) => updateDraft({ protocol: event.target.value as EditableApiProvider["protocol"] })}
+            onChange={(event) => {
+              const protocol = event.target.value as EditableApiProvider["protocol"];
+              updateDraft({ protocol, capabilities: normalizeProviderCapabilities({ ...draft, protocol }) });
+            }}
           >
             <option value="openai">OpenAI 兼容</option>
             <option value="apimart">APIMart 异步</option>
@@ -162,11 +186,29 @@ export function ApiSettings({ providers, onProvidersChange }: ApiSettingsProps) 
           保存
         </button>
       </div>
-      <div className="provider-summary">
-        <span>image {draft.imageModels.length}</span>
-        <span>chat {draft.chatModels.length}</span>
-        <span>video {draft.videoModels.length}</span>
+      <div className="provider-summary" aria-label="模型统计">
+        <span>图像模型 {draft.imageModels.length}</span>
+        <span>对话模型 {draft.chatModels.length}</span>
+        <span>视频模型 {draft.videoModels.length}</span>
         <span>合计 {modelCount}</span>
+      </div>
+      <div className="provider-capability-panel" aria-label="供应商能力">
+        <div className="provider-capability-head">
+          <strong>供应商能力</strong>
+          <span>按模型分类与协议字段归一化</span>
+        </div>
+        <div className="provider-capability-grid">
+          {capabilityKeys.map((key) => {
+            const capability = (draft.capabilities ?? normalizeProviderCapabilities(draft))[key];
+            return (
+              <div className={`provider-capability provider-capability-${capability.status}`} key={key}>
+                <span className="provider-capability-label">{capability.label}</span>
+                <span className="provider-capability-status">{capabilityStatusLabel[capability.status]}</span>
+                <small>{capability.reason}</small>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {status ? <p className="muted compact">{status}</p> : null}
     </section>
@@ -184,6 +226,12 @@ function emptyProvider(id = "mikuapi"): EditableApiProvider {
     imageModels: [],
     chatModels: [],
     videoModels: [],
+    capabilities: normalizeProviderCapabilities({
+      protocol: "openai",
+      imageModels: [],
+      chatModels: [],
+      videoModels: []
+    }),
     hasKey: false,
     keyPreview: "",
     apiKey: ""
@@ -203,4 +251,48 @@ function normalizeId(value: string): string {
 function mergeDraft(providers: ApiProvider[], draft: EditableApiProvider): EditableApiProvider[] {
   const existing = providers.filter((provider) => provider.id !== draft.id);
   return [{ ...draft, primary: true }, ...existing.map((provider) => ({ ...provider, primary: false }))];
+}
+
+const capabilityKeys: Array<keyof ProviderCapabilities> = ["text2img", "img2img", "inpaint", "video", "llm"];
+
+const capabilityStatusLabel: Record<ProviderCapabilityStatus, string> = {
+  available: "已支持",
+  inferred: "可推断",
+  unavailable: "未确认"
+};
+
+function normalizeProviderCapabilities(input: {
+  protocol: EditableApiProvider["protocol"];
+  imageModels?: string[];
+  chatModels?: string[];
+  videoModels?: string[];
+}): ProviderCapabilities {
+  const imageModels = input.imageModels ?? [];
+  const chatModels = input.chatModels ?? [];
+  const videoModels = input.videoModels ?? [];
+  const protocolSupportsRichModes = input.protocol === "openai" || input.protocol === "apimart";
+
+  const fromModel = (label: string, modelCount: number) => ({
+    label,
+    status: "available" as const,
+    source: "model" as const,
+    modelCount,
+    reason: `已识别 ${modelCount} 个相关模型`
+  });
+
+  const fromProtocol = (label: string) => ({
+    label,
+    status: protocolSupportsRichModes ? ("inferred" as const) : ("unavailable" as const),
+    source: protocolSupportsRichModes ? ("protocol" as const) : ("none" as const),
+    modelCount: 0,
+    reason: protocolSupportsRichModes ? "根据当前协议推断" : "当前协议未声明该能力"
+  });
+
+  return {
+    text2img: imageModels.length > 0 ? fromModel("文生图", imageModels.length) : fromProtocol("文生图"),
+    img2img: imageModels.length > 0 ? fromModel("图生图", imageModels.length) : fromProtocol("图生图"),
+    inpaint: fromProtocol("局部重绘"),
+    video: videoModels.length > 0 ? fromModel("视频", videoModels.length) : fromProtocol("视频"),
+    llm: chatModels.length > 0 ? fromModel("LLM", chatModels.length) : fromProtocol("LLM")
+  };
 }
