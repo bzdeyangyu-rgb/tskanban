@@ -23,6 +23,18 @@ export type GeneTemplate = PromptGeneTemplate | WorkflowGeneTemplate;
 
 export type GeneStorage = Pick<Storage, "getItem" | "setItem">;
 
+export type GeneDisplayMeta = {
+  typeLabel: string;
+  actionLabel: string;
+  detail: string;
+};
+
+export type GeneTypeCounts = {
+  total: number;
+  prompt: number;
+  workflow: number;
+};
+
 export function loadGenes(storage: GeneStorage | undefined): GeneTemplate[] {
   if (!storage) {
     return [];
@@ -86,12 +98,47 @@ export function nextWorkflowGeneName(existing: GeneTemplate[]): string {
   return `流程基因 ${nextGeneNumber(existing, "workflow")}`;
 }
 
+export function geneDisplayMeta(gene: GeneTemplate): GeneDisplayMeta {
+  if (gene.type === "workflow") {
+    return {
+      typeLabel: "流程",
+      actionLabel: "导入流程",
+      detail: `${gene.nodeCount} 节点`
+    };
+  }
+
+  return {
+    typeLabel: "提示词",
+    actionLabel: "生成提示词",
+    detail: compactPrompt(gene.prompt)
+  };
+}
+
+export function countGeneTypes(genes: GeneTemplate[]): GeneTypeCounts {
+  return genes.reduce<GeneTypeCounts>(
+    (counts, gene) => ({
+      total: counts.total + 1,
+      prompt: counts.prompt + (gene.type === "prompt" ? 1 : 0),
+      workflow: counts.workflow + (gene.type === "workflow" ? 1 : 0)
+    }),
+    { total: 0, prompt: 0, workflow: 0 }
+  );
+}
+
 function nextGeneNumber(existing: GeneTemplate[], type: GeneTemplate["type"]): number {
   return existing.filter((gene) => gene.type === type).length + 1;
 }
 
 function normalizedGeneName(name: string | undefined): string {
   return name?.trim() ?? "";
+}
+
+function compactPrompt(prompt: string): string {
+  const normalized = prompt.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "空提示词";
+  }
+  return normalized.length > 24 ? `${normalized.slice(0, 24)}...` : normalized;
 }
 
 function isGeneTemplate(value: unknown): value is GeneTemplate {

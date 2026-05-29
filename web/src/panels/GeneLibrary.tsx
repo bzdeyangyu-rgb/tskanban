@@ -1,6 +1,7 @@
+import React from "react";
 import { Dna, GitBranch, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import type { WorkflowGeneScope } from "../canvas/ReferenceCanvas";
-import type { GeneTemplate } from "./geneLibraryModel";
+import { countGeneTypes, geneDisplayMeta, type GeneTemplate } from "./geneLibraryModel";
 
 export function GeneLibraryPopover({
   geneScope,
@@ -21,6 +22,8 @@ export function GeneLibraryPopover({
   onRenameGene: (gene: GeneTemplate) => void;
   onUseGene: (gene: GeneTemplate) => void;
 }) {
+  const counts = countGeneTypes(genes);
+
   return (
     <div className="gene-library-popover" role="dialog" aria-label="基因库">
       <header>
@@ -32,6 +35,11 @@ export function GeneLibraryPopover({
           <X aria-hidden="true" size={15} />
         </button>
       </header>
+      <div className="gene-library-stats" aria-label="基因数量">
+        <span>{counts.total} 个基因</span>
+        <span>{counts.prompt} 提示词</span>
+        <span>{counts.workflow} 流程</span>
+      </div>
       <div className="gene-scope-tabs" aria-label="流程保存范围">
         {geneScopeOptions.map((option) => (
           <button
@@ -45,31 +53,43 @@ export function GeneLibraryPopover({
           </button>
         ))}
       </div>
-      <div className="gene-library-list">
+      <div className="gene-library-list" data-columns="3">
         {genes.length ? (
-          genes.map((gene) => (
-            <div className={`gene-tile is-${gene.type}`} key={gene.id}>
-              <button
-                type="button"
-                className={`gene-chip is-${gene.type}`}
-                data-testid="gene-chip"
-                onClick={() => onUseGene(gene)}
-                title={gene.type === "prompt" ? gene.prompt : `${gene.nodeCount} 个节点`}
-              >
-                {gene.type === "prompt" ? <Sparkles aria-hidden="true" size={15} /> : <GitBranch aria-hidden="true" size={15} />}
-                <span>{gene.name}</span>
-                {gene.type === "workflow" ? <small>{gene.nodeCount} 节点</small> : null}
-              </button>
-              <div className="gene-tile-actions" aria-label={`${gene.name} 操作`}>
-                <button type="button" data-testid="gene-rename-button" onClick={() => onRenameGene(gene)} title="重命名">
-                  <Pencil aria-hidden="true" size={12} />
+          genes.map((gene) => {
+            const meta = geneDisplayMeta(gene);
+
+            return (
+              <div className={`gene-tile is-${gene.type}`} key={gene.id}>
+                <button
+                  type="button"
+                  className={`gene-chip is-${gene.type}`}
+                  data-testid="gene-chip"
+                  onClick={() => onUseGene(gene)}
+                  title={gene.type === "prompt" ? gene.prompt : `${gene.nodeCount} 个节点`}
+                >
+                  <span className="gene-chip-topline">
+                    {gene.type === "prompt" ? (
+                      <Sparkles aria-hidden="true" size={15} />
+                    ) : (
+                      <GitBranch aria-hidden="true" size={15} />
+                    )}
+                    <small>{meta.typeLabel}</small>
+                  </span>
+                  <span className="gene-chip-name">{gene.name}</span>
+                  <small className="gene-chip-action">{meta.actionLabel}</small>
+                  <small className="gene-chip-detail">{meta.detail}</small>
                 </button>
-                <button type="button" data-testid="gene-delete-button" onClick={() => onDeleteGene(gene)} title="删除">
-                  <Trash2 aria-hidden="true" size={12} />
-                </button>
+                <div className="gene-tile-actions" aria-label={`${gene.name} 操作`}>
+                  <button type="button" data-testid="gene-rename-button" onClick={() => onRenameGene(gene)} title="重命名">
+                    <Pencil aria-hidden="true" size={12} />
+                  </button>
+                  <button type="button" data-testid="gene-delete-button" onClick={() => onDeleteGene(gene)} title="删除">
+                    <Trash2 aria-hidden="true" size={12} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="gene-empty">还没有基因</div>
         )}

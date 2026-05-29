@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  countGeneTypes,
   createPromptGene,
   createWorkflowGene,
+  geneDisplayMeta,
   loadGenes,
   nextPromptGeneName,
   nextWorkflowGeneName,
@@ -91,5 +93,35 @@ describe("geneLibraryModel", () => {
 
     expect(nextPromptGeneName([promptGene, workflowGene])).toBe("基因 2");
     expect(nextWorkflowGeneName([promptGene, workflowGene])).toBe("流程基因 2");
+  });
+
+  it("exposes display metadata for prompt and workflow genes", () => {
+    const promptGene = createPromptGene("  霓虹雨夜   赛博城市   强烈背光 电影感  ", [], "2026-05-22T09:00:00.000Z", "夜景");
+    const workflowGene = createWorkflowGene(
+      {
+        canvasId: "gene",
+        nodes: [
+          { id: "a", type: "prompt", x: 0, y: 0, width: 100, height: 100, data: {} },
+          { id: "b", type: "api_text2img", x: 130, y: 0, width: 100, height: 100, data: {} }
+        ],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 }
+      },
+      [promptGene],
+      "2026-05-22T09:02:00.000Z",
+      "出图流程"
+    );
+
+    expect(geneDisplayMeta(promptGene)).toEqual({
+      typeLabel: "提示词",
+      actionLabel: "生成提示词",
+      detail: "霓虹雨夜 赛博城市 强烈背光 电影感"
+    });
+    expect(geneDisplayMeta(workflowGene)).toEqual({
+      typeLabel: "流程",
+      actionLabel: "导入流程",
+      detail: "2 节点"
+    });
+    expect(countGeneTypes([promptGene, workflowGene])).toEqual({ total: 2, prompt: 1, workflow: 1 });
   });
 });
