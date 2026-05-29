@@ -1,0 +1,261 @@
+.reference-product-shell {
+  --ref-bg: #0f141d;
+  --ref-sidebar: #0f141d;
+  --ref-stage: #111722;
+  --ref-panel: #171d29;
+  --ref-soft: #111722;
+  --ref-hover: #171d29;
+  --ref-line: #242d3b;
+  --ref-line-strong: #2a3444;
+  --ref-text: #e5e9f0;
+  --ref-muted: #8f9aab;
+  --ref-active: #d8dee9;
+  --ref-active-text: #10141d;
+  --ref-ease: cubic-bezier(0.3, 0, 0, 1);
+  background: var(--ref-bg) !important;
+  color: var(--ref-text) !important;
+  font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+}
+
+:root[data-studio-theme="light"] .reference-product-shell {
+  --ref-bg: #ffffff;
+  --ref-sidebar: #ffffff;
+  --ref-stage: #fcfcfc;
+  --ref-panel: #ffffff;
+  --ref-soft: #f7f8fa;
+  --ref-hover: #fafafa;
+  --ref-line: #f2f2f2;
+  --ref-line-strong: #e8ecf2;
+  --ref-text: #121212;
+  --ref-muted: #8b8f98;
+  --ref-active: #111111;
+  --ref-active-text: #ffffff;
+}
+
+.reference-product-shell .studio-sidebar {
+  width: 64px !important;
+  min-width: 64px !important;
+  flex: 0 0 64px !important;
+  padding: 34px 0 18px !important;
+  gap: 30px !important;
+  background: var(--ref-sidebar) !important;
+  border-right: 1px solid var(--ref-line) !important;
+  transition: width 0.42s var(--ref-ease), flex-basis 0.42s var(--ref-ease), background 0.24s ease !important;
+}
+
+.reference-product-shell .studio-sidebar:hover {
+  width: 326px !important;
+  min-width: 326px !important;
+  flex-basis: 326px !important;
+}
+
+.reference-product-shell .studio-logo {
+  width: 36px !important;
+  height: 36px !important;
+  border: 2px solid var(--ref-text) !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  transition: transform 0.42s var(--ref-ease), border-radius 0.42s var(--ref-ease) !important;
+}
+
+.reference-product-shell .studio-sidebar:hover .studio-logo {
+  transform: rotate(90deg);
+  border-radius: 50% !important;
+}
+
+.reference-product-shell .studio-logo span {
+  width: 7px !important;
+  height: 7px !important;
+  background: var(--ref-text) !important;
+}
+
+.reference-product-shell .studio-nav {
+  gap: 12px !important;
+}
+
+.reference-button {
+  border: 1px solid transparent;
+  color: var(--ref-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.reference-button-nav {
+  width: 48px !important;
+  height: 48px !important;
+  margin-left: 8px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  border-radius: 18px !important;
+  transition: width 0.3s var(--ref-ease), background 0.18s ease, color 0.18s ease !important;
+}
+
+.reference-product-shell .studio-sidebar:hover .reference-button-nav {
+  width: 286px !important;
+  padding-left: 14px !important;
+  justify-content: flex-start !important;
+  gap: 16px !important;
+}
+
+.reference-button-nav:hover,
+.reference-button-side:hover {
+  color: var(--ref-text) !important;
+  background: var(--ref-hover) !important;
+}
+
+.reference-button-nav.is-active,
+.reference-button-side.is-active {
+  color: var(--ref-active-text) !important;
+  background: var(--ref-active) !important;
+}
+
+.reference-button-nav span,
+.reference-button-side span {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  letter-spacing: 0;
+  transition: max-width 0.26s var(--ref-ease), opacity 0.2s ease;
+}
+
+.reference-button-nav span {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+.reference-product-shell .studio-sidebar:hover .reference-button-nav span,
+.reference-product-shell .studio-sidebar:hover .reference-button-side span {
+  max-width: 190px;
+  opacity: 1;
+}
+
+.reference-product-shell .studio-side-actions {
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+}
+
+.reference-button-side {
+  width: 44px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  border: 1px solid var(--ref-line) !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  transition: width 0.3s var(--ref-ease), background 0.18s ease, color 0.18s ease, border-color 0.18s ease !important;
+}
+
+.reference-product-shell .studio-sidebar:hover .reference-button-side {
+  width: 170px !important;
+  gap: 8px !important;
+}
+
+.reference-button-side span {
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.reference-product-shell .studio-author {
+  min-height: 20px;
+  color: var(--ref-text) !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+
+.reference-product-shell .studio-stage {
+  margin: 16px !important;
+  border-radius: 32px !important;
+  border-color: var(--ref-line-strong) !important;
+  background: var(--ref-stage) !important;
+}
+
+.reference-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.reference-tooltip::after {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 100;
+  max-width: 180px;
+  padding: 6px 9px;
+  border: 1px solid var(--ref-line-strong);
+  border-radius: 8px;
+  color: var(--ref-text);
+  background: rgba(23, 29, 41, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
+}
+
+.reference-tooltip:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.reference-modal {
+  width: min(980px, calc(100vw - 420px));
+  max-height: calc(100vh - 88px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ref-line-strong);
+  border-radius: 18px;
+  background: var(--ref-panel);
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.26);
+}
+
+.reference-modal-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--ref-line);
+}
+
+.reference-modal-head strong {
+  display: block;
+  color: var(--ref-text);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.reference-modal-head p {
+  max-width: 560px;
+  margin: 6px 0 0;
+  color: var(--ref-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.reference-modal-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 22px;
+}
+
+.reference-product-shell .studio-api-page {
+  padding: 32px !important;
+}
+
+.reference-product-shell .studio-api-page > .reference-modal .panel,
+.reference-product-shell .studio-api-page > .reference-modal .api-settings {
+  width: 100% !important;
+}

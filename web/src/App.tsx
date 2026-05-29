@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import React, { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "tldraw";
 import {
   Box,
@@ -19,6 +19,7 @@ import {
   ListTodo,
   MessageSquare,
   MessageSquareText,
+  Moon,
   Play,
   Plus,
   RefreshCw,
@@ -26,7 +27,6 @@ import {
   Save,
   SlidersHorizontal,
   Settings,
-  Sun,
   TextCursorInput,
   Trash2,
   WandSparkles,
@@ -79,6 +79,11 @@ import {
 import { Inspector } from "./panels/Inspector";
 import { NodePalette } from "./panels/NodePalette";
 import { RunHistory } from "./panels/RunHistory";
+import { ProductShell } from "./ui/ProductShell";
+import { ReferenceButton } from "./ui/ReferenceButton";
+import { ReferenceModal } from "./ui/ReferenceModal";
+import { Tooltip } from "./ui/Tooltip";
+import "./styles.css";
 
 type SelectedNode = {
   id: string;
@@ -230,7 +235,7 @@ export function App() {
   useEffect(() => {
     const handleLinkDragStart = (event: Event) => {
       if (!editor) {
-        setStatus("鐢诲竷杩樺湪鍔犺浇");
+        setStatus("画布还在加载");
         return;
       }
 
@@ -877,7 +882,7 @@ export function App() {
   );
 
   return (
-    <main className="studio-app-shell">
+    <ProductShell>
       <StudioSidebar
         activePage={activePage}
         language={language}
@@ -984,20 +989,22 @@ export function App() {
           </>
         ) : activePage === "api-settings" ? (
           <section className="studio-page-frame studio-api-page" aria-label="API 设置">
-            <ApiSettings providers={providers} onProvidersChange={setProviders} />
+            <ReferenceModal title="API 设置" description="管理平台地址、模型列表和 Key，保持画布与功能页使用同一套 API 配置。">
+              <ApiSettings providers={providers} onProvidersChange={setProviders} />
+            </ReferenceModal>
           </section>
         ) : (
           <StudioApiPage pageId={activePage} providers={providers} />
         )}
         <NanoMonitor queue={lastRunNodes.filter((node) => node.status === "running").length} />
       </section>
-    </main>
+    </ProductShell>
   );
 }
 
 function StudioSidebar({
   activePage,
-  language,
+  language: _language,
   theme,
   onLanguageToggle,
   onSwitch,
@@ -1020,37 +1027,44 @@ function StudioSidebar({
           const Icon = item.icon;
           const isActive = activePage === item.id;
           return (
-            <button
-              className={`studio-nav-item ${isActive ? "is-active" : ""}`}
-              type="button"
-              key={item.id}
-              title={item.label}
-              onClick={() => onSwitch(item.id)}
-            >
-              <Icon aria-hidden="true" size={18} />
-              <span>{item.label}</span>
-            </button>
+            <Tooltip text={item.label} key={item.id}>
+              <ReferenceButton
+                className="studio-nav-item"
+                icon={Icon}
+                isActive={isActive}
+                label={item.label}
+                title={item.label}
+                variant="nav"
+                onClick={() => onSwitch(item.id)}
+              />
+            </Tooltip>
           );
         })}
       </nav>
-      <div className="studio-side-actions" aria-label={"\u8f85\u52a9\u64cd\u4f5c"}>
-        <button type="button" title={theme === "dark" ? "\u9ed1\u591c\u6a21\u5f0f" : "\u767d\u5929\u6a21\u5f0f"} className={theme === "dark" ? "is-active" : ""} onClick={onThemeToggle}>
-          <Sun aria-hidden="true" size={16} />
-          <span>{theme === "dark" ? "\u9ed1\u591c\u6a21\u5f0f" : "\u767d\u5929\u6a21\u5f0f"}</span>
-        </button>
-        <button type="button" title="中文" onClick={onLanguageToggle}>
-          <Languages aria-hidden="true" size={16} />
-          <span>{language === "zh" ? "中文" : "English"}</span>
-        </button>
-        <button
-          type="button"
-          title="API 设置"
-          className={activePage === "api-settings" ? "is-active" : ""}
-          onClick={() => onSwitch("api-settings")}
-        >
-          <Link aria-hidden="true" size={16} />
-          <span>API 设置</span>
-        </button>
+      <div className="studio-side-actions" aria-label="辅助操作">
+        <Tooltip text="黑夜模式">
+          <ReferenceButton
+            icon={Moon}
+            isActive={theme === "dark"}
+            label="黑夜模式"
+            title="黑夜模式"
+            variant="side"
+            onClick={onThemeToggle}
+          />
+        </Tooltip>
+        <Tooltip text="中文">
+          <ReferenceButton icon={Languages} label="中文" title="中文" variant="side" onClick={onLanguageToggle} />
+        </Tooltip>
+        <Tooltip text="API 设置">
+          <ReferenceButton
+            icon={Link}
+            isActive={activePage === "api-settings"}
+            label="API 设置"
+            title="API 设置"
+            variant="side"
+            onClick={() => onSwitch("api-settings")}
+          />
+        </Tooltip>
       </div>
       <div className="studio-author">Side</div>
     </aside>
@@ -1530,7 +1544,7 @@ function LinkCommandPopover({
         })}
       </div>
       <button className="link-command-close" type="button" onClick={onClose}>
-        鍙栨秷
+        取消
       </button>
     </div>
   );
@@ -1601,7 +1615,7 @@ function StudioDrawer({
 
 function QuickFloat({ onNewCanvas, onOpenSettings }: { onNewCanvas: () => void; onOpenSettings: () => void }) {
   return (
-    <div className="studio-quick-float" aria-label="韫囶偅宓庨幙宥勭稊">
+    <div className="studio-quick-float" aria-label="快捷操作">
       <button type="button" onClick={onNewCanvas} title="新建画布">
         <Grid3X3 aria-hidden="true" size={16} />
       </button>
@@ -1759,7 +1773,7 @@ function upsertCanvasItem(items: CanvasGateItem[], id: string, title: string, up
 function formatGateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "鍒氬垰";
+    return "刚刚";
   }
   return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
