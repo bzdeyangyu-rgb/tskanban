@@ -51,6 +51,36 @@ export type RagEvent = {
   local_prompt?: string | undefined;
 };
 
+export type RetryableErrorInput = {
+  status?: number | undefined;
+  statusCode?: number | undefined;
+  code?: string | undefined;
+  message?: string | undefined;
+  response?: { status?: number | undefined } | undefined;
+};
+
+export type NodeRunRecordInput = {
+  sessionId?: string | undefined;
+  flowId: string;
+  canvasId?: string | undefined;
+  runId?: string | undefined;
+  nodeId: string;
+  nodeType: string;
+  status: RagEvent["status"];
+  attempts: number;
+  maxRetries?: number | undefined;
+  latencyMs: number;
+  model?: string | undefined;
+  prompt?: string | undefined;
+  inputAssetIds?: string[] | undefined;
+  outputAssetIds?: string[] | undefined;
+  nodeInputs?: Record<string, unknown> | undefined;
+  flowStructure?: RagEvent["flow_structure"];
+  errorMessage?: string | undefined;
+  selectionBox?: RagEvent["selection_box"];
+  localPrompt?: string | undefined;
+};
+
 export type EventQuery = {
   sessionId?: string | undefined;
   action?: string | undefined;
@@ -103,6 +133,64 @@ export function createBaseEvent(input: {
   };
 }
 
+export function classifyRetryableError(error: unknown): boolean {
+  const info = normalizeErrorInfo(error);
+  const message = info.message.toLowerCase();
+
+  if (isNonRetryableClientError(info.status) || /\b(missing|required|invalid|unauthorized|forbidden|api key|auth)\b/.test(message)) {
+    return false;
+  }
+
+  if (info.status === 429 || info.status === 408 || (typeof info.status === "number" && info.status >= 500)) {
+    return true;
+  }
+
+  if (info.code && ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EAI_AGAIN", "ENOTFOUND", "ECONNABORTED"].includes(info.code)) {
+    return true;
+  }
+
+  if (/\b(network|timeout|timed out|socket hang up|rate limit|too many requests)\b/.test(message)) {
+    return true;
+  }
+
+  return true;
+}
+
+export function createNodeRunRecord(input: NodeRunRecordInput): RagEvent {
+  return {
+    event_id: randomUUID(),
+    timestamp: new Date().toISOString(),
+    session_id: input.sessionId ?? "workflow",
+    action: "flow_execute",
+    model: input.model ?? "local",
+    prompt: input.prompt ?? "execute_node",
+    params: {
+      canvasId: input.canvasId,
+      runId: input.runId,
+      nodeId: input.nodeId,
+      attempts: input.attempts
+    },
+    input_assets: input.inputAssetIds ?? [],
+    output_assets: input.outputAssetIds ?? [],
+    status: input.status,
+    latency_ms: input.latencyMs,
+    error_message: input.errorMessage,
+    flow_id: input.flowId,
+    canvas_id: input.canvasId,
+    run_id: input.runId,
+    flow_structure: input.flowStructure,
+    node_id: input.nodeId,
+    node_type: input.nodeType,
+    node_status: input.status,
+    retry_attempt: input.attempts,
+    max_retries: input.maxRetries ?? 3,
+    node_latency_ms: input.latencyMs,
+    node_inputs: input.nodeInputs,
+    selection_box: input.selectionBox,
+    local_prompt: input.localPrompt
+  };
+}
+
 export async function logEvent(event: RagEvent): Promise<void> {
   await mkdir(LOG_DIR, { recursive: true });
 
@@ -137,6 +225,26 @@ export function toMarkdownBlock(event: RagEvent): string {
     : "";
 
   return `\n## ${date} ${event.action} ${event.status}\n- session: ${event.session_id}\n- model: ${event.model}\n- prompt: "${event.prompt}"\n- negative_prompt: "${event.negative_prompt ?? ""}"\n- params: ${params}\n- input: ${input}\n- output: ${output}\n- latency: ${event.latency_ms}ms${flowInfo}${canvasInfo}${canvasSnapshotInfo}${runInfo}${targetNodeInfo}${nodeInfo}${retryInfo}${nodeInputsInfo}${selectionInfo}${error}\n`;
+}
+
+function normalizeErrorInfo(error: unknown): { message: string; status?: number | undefined; code?: string | undefined } {
+  if (!error || typeof error !== "object") {
+    return { message: String(error), status: undefined, code: undefined };
+  }
+
+  const record = error as RetryableErrorInput;
+  const status = numericStatus(record.status) ?? numericStatus(record.statusCode) ?? numericStatus(record.response?.status);
+  const message = typeof record.message === "string" ? record.message : String(error);
+  const code = typeof record.code === "string" ? record.code : undefined;
+  return { message, status, code };
+}
+
+function numericStatus(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function isNonRetryableClientError(status: number | undefined): boolean {
+  return typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
 export async function readLatestEvents(limit: number): Promise<RagEvent[]> {

@@ -1,5 +1,6 @@
 import { validateFlowSnapshot } from "./validate";
 import type { ExecutableNodeType, FlowNode, FlowSnapshot, NodeExecutionResult } from "./types";
+import { classifyRetryableError } from "../logger";
 
 export type CompiledNodeInputs = {
   node: FlowNode;
@@ -96,7 +97,7 @@ export async function executeFlowSnapshot(
         break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
-        if (attempt === maxRetries) {
+        if (attempt === maxRetries || !classifyRetryableError(error)) {
           const failed = createResult({
             node,
             status: "failed",

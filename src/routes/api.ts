@@ -30,7 +30,7 @@ import { generateImage } from "../imageApi";
 import { createBaseEvent, createFlowId, logEvent, queryEvents } from "../logger";
 import { listTemplates, saveTemplate, findTemplate } from "../templates";
 import { validateFlowSnapshot } from "../flows/validate";
-import { createCanvas, listCanvases, loadCanvas, saveCanvas } from "../services/canvases";
+import { createCanvas, deleteCanvas, listCanvases, loadCanvas, restoreCanvas, saveCanvas } from "../services/canvases";
 import { executeFlowSnapshot } from "../flows/execute";
 import type { FlowSnapshot } from "../flows/types";
 import { createApiFlowRunners } from "../flows/runners/api";
@@ -553,9 +553,10 @@ apiRouter.post("/canvases", async (req, res) => {
   }
 });
 
-apiRouter.get("/canvases", async (_req, res) => {
+apiRouter.get("/canvases", async (req, res) => {
   try {
-    const canvases = await listCanvases();
+    const includeDeleted = req.query.includeDeleted === "true";
+    const canvases = await listCanvases({ includeDeleted });
     res.json({ ok: true, data: canvases });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -580,6 +581,26 @@ apiRouter.put("/canvases/:canvasId", async (req, res) => {
 apiRouter.get("/canvases/:canvasId", async (req, res) => {
   try {
     const canvas = await loadCanvas(req.params.canvasId);
+    res.json({ ok: true, data: canvas });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(404).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.delete("/canvases/:canvasId", async (req, res) => {
+  try {
+    const canvas = await deleteCanvas(req.params.canvasId);
+    res.json({ ok: true, data: canvas });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(404).json({ ok: false, error: message });
+  }
+});
+
+apiRouter.post("/canvases/:canvasId/restore", async (req, res) => {
+  try {
+    const canvas = await restoreCanvas(req.params.canvasId);
     res.json({ ok: true, data: canvas });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

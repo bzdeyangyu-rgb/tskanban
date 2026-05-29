@@ -10,12 +10,14 @@ export type StoredCanvas = FlowSnapshot & {
   title: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | undefined;
 };
 
 export type SaveCanvasInput = FlowSnapshot & {
   title: string;
   createdAt?: string | undefined;
   updatedAt?: string | undefined;
+  deletedAt?: string | undefined;
 };
 
 export type CreateCanvasInput = {
@@ -62,7 +64,7 @@ export async function loadCanvas(canvasId: string): Promise<StoredCanvas> {
   return JSON.parse(raw) as StoredCanvas;
 }
 
-export async function listCanvases(): Promise<StoredCanvas[]> {
+export async function listCanvases(options: { includeDeleted?: boolean | undefined } = {}): Promise<StoredCanvas[]> {
   try {
     const entries = await readdir(CANVAS_DIR, { withFileTypes: true });
     const canvases = await Promise.all(
@@ -73,13 +75,29 @@ export async function listCanvases(): Promise<StoredCanvas[]> {
           return JSON.parse(raw) as StoredCanvas;
         })
     );
-    return canvases.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    return canvases
+      .filter((canvas) => options.includeDeleted || !canvas.deletedAt)
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
     }
     throw error;
   }
+}
+
+export async function deleteCanvas(canvasId: string): Promise<StoredCanvas> {
+  const canvas = await loadCanvas(canvasId);
+  return saveCanvas({
+    ...canvas,
+    deletedAt: canvas.deletedAt ?? new Date().toISOString()
+  });
+}
+
+export async function restoreCanvas(canvasId: string): Promise<StoredCanvas> {
+  const canvas = await loadCanvas(canvasId);
+  const { deletedAt: _deletedAt, ...restored } = canvas;
+  return saveCanvas(restored);
 }
 
 export function canvasPath(canvasId: string): string {
